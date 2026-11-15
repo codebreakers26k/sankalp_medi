@@ -65,6 +65,17 @@ class EmailService {
 
   async sendEmail(options: EmailOptions): Promise<boolean> {
     try {
+      const isDevPlaceholder = !process.env.SMTP_USER || 
+        process.env.SMTP_USER === 'your-email@gmail.com' || 
+        process.env.SMTP_PASS?.includes('app-password');
+
+      if (isDevPlaceholder) {
+        console.log(`\n📧 [DEV SIMULATION] Email to: ${options.to}`);
+        console.log(`Subject: ${options.subject}`);
+        console.log(`Content Preview: ${options.text || 'HTML Email Sent'}\n`);
+        return true;
+      }
+
       console.log('📨 Attempting to send email to:', options.to);
       const transporter = await this.initializeTransporter();
       
@@ -97,6 +108,18 @@ class EmailService {
   }
 
   async sendOTPEmail(email: string, otp: string, purpose: string = 'appointment'): Promise<boolean> {
+    const isDevPlaceholder = !process.env.SMTP_USER || 
+      process.env.SMTP_USER === 'your-email@gmail.com' || 
+      process.env.SMTP_PASS?.includes('app-password');
+
+    if (isDevPlaceholder) {
+      console.log(`\n======================================================`);
+      console.log(`🔐 [DEV MODE OTP] For: ${email}`);
+      console.log(`👉 OTP CODE: ${otp}`);
+      console.log(`======================================================\n`);
+      return true;
+    }
+
     const subject = `Your OTP for ${purpose} verification`;
     
     const html = `

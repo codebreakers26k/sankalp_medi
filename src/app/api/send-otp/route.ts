@@ -50,10 +50,12 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ OTP sent successfully!');
+    const isDev = !process.env.SMTP_USER || process.env.SMTP_USER === 'your-email@gmail.com' || process.env.SMTP_PASS?.includes('app-password');
     return NextResponse.json({
       success: true,
-      message: 'OTP sent successfully to your email',
-      otpId: id
+      message: isDev ? `DEV MODE: OTP is ${otp}` : 'OTP sent successfully to your email',
+      otpId: id,
+      ...(isDev ? { devOtp: otp } : {})
     });
 
   } catch (error: any) {

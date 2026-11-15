@@ -39,7 +39,7 @@ class NotificationService {
         });
 
       if (eventError) {
-        console.error('Error inserting admin event:', eventError);
+        console.warn('Admin event notice:', eventError?.message || eventError);
       }
 
       return true;

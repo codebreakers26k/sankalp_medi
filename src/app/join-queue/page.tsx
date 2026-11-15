@@ -83,8 +83,8 @@ export default function JoinQueuePage() {
       
       if (error) throw error;
       setHospitals(data || []);
-    } catch (error) {
-      console.error('Error fetching hospitals:', error);
+    } catch (error: any) {
+      console.error('Error fetching hospitals:', error?.message || error);
     }
   };
 
@@ -98,8 +98,8 @@ export default function JoinQueuePage() {
 
       if (error) throw error;
       setDepartments(data || []);
-    } catch (error) {
-      console.error('Error fetching departments:', error);
+    } catch (error: any) {
+      console.error('Error fetching departments:', error?.message || error);
     }
   };
 
@@ -115,8 +115,8 @@ export default function JoinQueuePage() {
 
       if (error) throw error;
       setDoctors(data || []);
-    } catch (error) {
-      console.error('Error fetching doctors:', error);
+    } catch (error: any) {
+      console.error('Error fetching doctors:', error?.message || error);
     }
   };
 

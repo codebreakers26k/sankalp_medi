@@ -25,6 +25,18 @@ yarn-error.log*
 
 # Local env files
 .env
+.env*
+.env.local
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Agent configurations and MCP credentials
+.agents/
+.agent/
+_agents/
+_agent/
 
 # Vercel
 .vercel
