@@ -24,8 +24,8 @@ class NotificationService {
         });
 
       if (error) {
-        console.error('Error inserting notification:', error);
-        throw error;
+        console.warn('Notification insert notice:', error?.message || error);
+        // non-fatal, continue
       }
 
       // Also create a real-time event for immediate notification
