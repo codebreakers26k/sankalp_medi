@@ -20,6 +20,10 @@ export function EmergencyButton({ hospitalId, departmentId, onEmergencyCreated }
   const [qrData, setQrData] = useState<any>(null);
 
   const handleEmergencyClick = async () => {
+    if (!hospitalId) {
+      alert('Please select a hospital first before activating emergency.');
+      return;
+    }
     setShowModal(true);
   };
 
@@ -89,8 +93,8 @@ export function EmergencyButton({ hospitalId, departmentId, onEmergencyCreated }
 
       {/* Emergency Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-red-600">Emergency Queue</h2>
               <button
@@ -108,8 +112,7 @@ export function EmergencyButton({ hospitalId, departmentId, onEmergencyCreated }
                   <div>
                     <h3 className="font-semibold text-red-900">Emergency Protocol</h3>
                     <p className="text-sm text-red-700 mt-1">
-                      This will prioritize the patient for immediate medical attention.
-                      The patient will be taken to the operation room for emergency surgery.
+                      Patient will be placed at the front of the queue with immediate priority and assigned to the Emergency department doctor.
                     </p>
                   </div>
                 </div>
@@ -123,11 +126,11 @@ export function EmergencyButton({ hospitalId, departmentId, onEmergencyCreated }
                   <span className="text-sm font-medium text-gray-700">Emergency Details</span>
                 </div>
                 <ul className="text-sm text-gray-600 space-y-1">
-                  <li>• Immediate priority in queue</li>
-                  <li>• Direct to operation room</li>
-                  <li>• Emergency surgery protocol initiated</li>
+                  <li>• Placed at #1 position in queue</li>
+                  <li>• Assigned to Emergency department</li>
+                  <li>• Doctor notified immediately</li>
                   <li>• Zero wait time</li>
-                  <li>• Critical care team alerted</li>
+                  <li>• Admin alerted</li>
                 </ul>
               </div>
 

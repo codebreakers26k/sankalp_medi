@@ -247,8 +247,7 @@ export default function BookAppointmentPage() {
       
       if (!response.ok) {
         console.error('Error fetching hospitals:', result.error);
-        // Show user-friendly error
-        alert(`Failed to load hospitals: ${result.error || 'Unknown error'}`);
+        // Don't alert — just log it; hospitals will be empty
         return;
       }
       

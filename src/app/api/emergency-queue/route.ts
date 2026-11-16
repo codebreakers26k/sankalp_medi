@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
     let finalUserId = userId;
     if (userId && userEmail) {
       try {
-        const patientId = `PAT${Date.now().toString().slice(-6)}`;
+        // Use deterministic patient_id based on userId to avoid unique constraint conflicts
+        const patientId = `PAT${userId.slice(-8).toUpperCase()}`;
         const { error: userError } = await supabase
           .from('users')
           .upsert({
@@ -59,12 +60,11 @@ export async function POST(request: NextRequest) {
           });
         
         if (userError) {
-          console.error('User upsert error:', userError);
-          // Continue with emergency_user as fallback
+          console.warn('User upsert notice:', userError?.message || userError);
+          // Continue with fallback
         }
       } catch (error) {
-        console.error('Error creating user:', error);
-        // Continue with emergency_user as fallback
+        console.warn('Error creating user, continuing:', error);
       }
     }
 
@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
         title: '🚨 EMERGENCY CASE',
         message: `Emergency patient "${patientName || 'Unknown'}" at ${hospitalData?.name || 'Hospital'} - Emergency Department. Immediate attention required!`,
         read: false,
+        user_id: null,
         created_at: new Date().toISOString()
       });
 
@@ -153,6 +154,7 @@ export async function POST(request: NextRequest) {
           title: '🚨 EMERGENCY PATIENT ASSIGNED',
           message: `Emergency patient "${patientName || 'Unknown'}" has been assigned to you at ${hospitalData?.name || 'Hospital'}. Immediate attention required!`,
           read: false,
+          user_id: null,
           created_at: new Date().toISOString(),
           metadata: {
             doctorId: assignedDoctor.id,
