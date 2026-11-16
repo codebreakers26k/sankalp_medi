@@ -5,7 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, ArrowLeft, Clock, User as UserIcon, X, Hospital, Activity, Mail, Phone, CheckCircle2, UserCheck } from "lucide-react";
+import { Calendar, ArrowLeft, Clock, User as UserIcon, X, Hospital, Activity, Mail, Phone, CheckCircle2, UserCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase/client";
@@ -47,6 +47,12 @@ export default function BookAppointmentPage() {
   const [rescheduleData, setRescheduleData] = useState<any>(null);
   const [cancelData, setCancelData] = useState<any>(null);
   const [waitlistData, setWaitlistData] = useState<any>(null);
+
+  // Gemini AI Triage State
+  const [showAITriageModal, setShowAITriageModal] = useState(false);
+  const [aiSymptoms, setAiSymptoms] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<any>(null);
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -192,6 +198,35 @@ export default function BookAppointmentPage() {
     } catch (error) {
       console.error('Cancel error:', error);
       alert('Failed to cancel appointment');
+    }
+  };
+
+  const handleAITriage = async () => {
+    if (!aiSymptoms.trim()) return;
+    setAiLoading(true);
+    try {
+      const res = await fetch("/api/ai/triage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ symptoms: aiSymptoms }),
+      });
+      const data = await res.json();
+      if (data.success && data.triage) {
+        setAiResult(data.triage);
+        // Match recommended department name with available departments
+        const match = departments.find((d) =>
+          d.name.toLowerCase().includes(data.triage.department.toLowerCase()) ||
+          data.triage.department.toLowerCase().includes(d.name.toLowerCase())
+        );
+        if (match) {
+          setSelectedDepartment(match.id);
+          setSelectedDoctor("");
+        }
+      }
+    } catch (e) {
+      console.error("AI Triage error:", e);
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -802,9 +837,20 @@ export default function BookAppointmentPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
-                    Select Department
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
+                      Select Department
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setShowAITriageModal(true)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-gradient-to-r from-purple-500/10 to-blue-500/10 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/60 hover:from-purple-500/20 hover:to-blue-500/20 transition-all cursor-pointer shadow-xs"
+                      title="Describe symptoms for AI-recommended department"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span>AI Triage Assistant</span>
+                    </button>
+                  </div>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
                       <Activity className="h-5 w-5 text-slate-400" />
@@ -827,6 +873,28 @@ export default function BookAppointmentPage() {
                       ))}
                     </select>
                   </div>
+
+                  {/* AI Triage Recommendation Notice */}
+                  {aiResult && (
+                    <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs">
+                      <div className="flex items-center gap-1.5 font-bold text-purple-900 dark:text-purple-200">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                        <span>AI Suggestion: {aiResult.department}</span>
+                        <span className={`px-1.5 py-0.5 rounded-full text-[10px] uppercase font-bold ${
+                          aiResult.urgency === 'emergency'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                            : aiResult.urgency === 'urgent'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                        }`}>
+                          {aiResult.urgency}
+                        </span>
+                      </div>
+                      <p className="text-zinc-600 dark:text-zinc-400 mt-1">
+                        {aiResult.reasoning}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1461,6 +1529,103 @@ export default function BookAppointmentPage() {
                     className="flex-1"
                   >
                     Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Gemini AI Symptom Triage Modal */}
+        {showAITriageModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 max-w-lg w-full shadow-2xl transition-all">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-serif font-bold text-lg text-zinc-900 dark:text-white">
+                      AI Clinical Triage
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                      Powered by Google Gemini 2.5 Flash
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAITriageModal(false)}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 mb-1.5">
+                    Describe your symptoms or reason for visit
+                  </label>
+                  <textarea
+                    value={aiSymptoms}
+                    onChange={(e) => setAiSymptoms(e.target.value)}
+                    placeholder="e.g. Sharp pain in the lower right abdomen since morning with mild nausea..."
+                    rows={4}
+                    className="w-full px-3.5 py-2.5 rounded-xl text-xs bg-zinc-50 dark:bg-zinc-800/70 border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                {aiResult && (
+                  <div className="p-4 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-purple-950 dark:text-purple-200">
+                        Recommended: {aiResult.department}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        aiResult.urgency === 'emergency'
+                          ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
+                          : aiResult.urgency === 'urgent'
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                      }`}>
+                        {aiResult.urgency}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-600 dark:text-zinc-300">
+                      {aiResult.reasoning}
+                    </p>
+                    {aiResult.selfCareAdvice?.length > 0 && (
+                      <div className="pt-2 border-t border-purple-200/50 dark:border-purple-800/40">
+                        <span className="text-[10px] uppercase font-bold text-zinc-500 dark:text-zinc-400 block mb-1">
+                          Preliminary Guidance
+                        </span>
+                        <ul className="text-xs text-zinc-600 dark:text-zinc-400 list-disc list-inside space-y-0.5">
+                          {aiResult.selfCareAdvice.map((a: string, i: number) => (
+                            <li key={i}>{a}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowAITriageModal(false)}
+                    className="flex-1 rounded-xl"
+                  >
+                    Close
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleAITriage}
+                    disabled={aiLoading || !aiSymptoms.trim()}
+                    className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white rounded-xl font-bold shadow-xs cursor-pointer"
+                  >
+                    {aiLoading ? "Analyzing Symptoms..." : "Analyze with Gemini"}
                   </Button>
                 </div>
               </div>
