@@ -1,16 +1,44 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="dark"], [data-theme="dark"] *));
+
 :root {
-  --background: #F8FAFC;
-  --foreground: #0F172A;
+  --background: #FAF8F5;
+  --foreground: #13221C;
   --primary: #2563EB;
   --primary-dark: #1D4ED8;
   --secondary: #7C3AED;
   --success: #10B981;
   --card-bg: #FFFFFF;
-  --border: #E5E7EB;
-  --text-primary: #0F172A;
-  --text-secondary: #64748B;
+  --border: #ECE5DB;
+  --text-primary: #13221C;
+  --text-secondary: #5B6D63;
+  color-scheme: light;
+}
+
+.dark, [data-theme="dark"] {
+  --background: #090D16;
+  --foreground: #F8FAFC;
+  --primary: #3B82F6;
+  --primary-dark: #2563EB;
+  --secondary: #8B5CF6;
+  --success: #10B981;
+  --card-bg: #111827;
+  --border: #1F2937;
+  --text-primary: #F8FAFC;
+  --text-secondary: #94A3B8;
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dark body, [data-theme="dark"] body {
+  background-color: #090D16;
+  color: #F8FAFC;
 }
 
 @theme inline {
@@ -43,6 +71,11 @@ body {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass, [data-theme="dark"] .glass {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* Blob animations */
@@ -95,10 +128,16 @@ body {
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
   background: #F1F5F9;
+}
+
+.dark ::-webkit-scrollbar-track,
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #090D16;
 }
 
 ::-webkit-scrollbar-thumb {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import {
   Hospital,
@@ -14,90 +15,286 @@ import {
   Clock,
   Zap,
   CheckCircle,
-  ChevronRight,
-  ChevronDown,
   Star,
-  Sparkles,
   HeartPulse,
   Stethoscope,
   LayoutDashboard,
+  ChevronRight,
+  Brain,
+  Scan,
+  Bell,
+  FileText,
+  Award,
+  ShieldCheck,
+  PhoneCall,
+  Sparkles,
+  MapPin,
+  Check,
+  RotateCw,
+  Menu,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 
-// ─── Animation Variants ────────────────────────────────────────────
-const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
+// ── KokonutUI Components ──────────────────────────────────────────────────────
+import SplitFlapText from "@/components/kokonutui/split-flap-text";
+import CradleText from "@/components/kokonutui/cradle-text";
+import { MarkerText, Mark } from "@/components/kokonutui/marker-text";
+import CardFlip, { QR_SIZE, buildQrPath } from "@/components/kokonutui/card-flip";
+import ProfileDropdown, { Account, ProfileMenuItem } from "@/components/kokonutui/profile-dropdown";
+import SlotPicker from "@/components/kokonutui/slot-picker";
+import FileUpload from "@/components/kokonutui/file-upload";
+import AIMessageQueue from "@/components/kokonutui/ai-message-queue";
+import AIAttachment from "@/components/kokonutui/ai-attachment";
+import { useTheme } from "@/components/theme-provider";
+import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
+
+// ── Animation Helpers ─────────────────────────────────────────────────────────
+const EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
 const fadeUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (i: number = 0) => ({
+  hidden: { opacity: 0, y: 28 },
+  visible: (i = 0) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, delay: i * 0.1, ease: EASE_OUT_EXPO },
-  }),
-};
-
-const fadeIn = {
-  hidden: { opacity: 0 },
-  visible: (i: number = 0) => ({
-    opacity: 1,
-    transition: { duration: 0.5, delay: i * 0.1 },
+    transition: { duration: 0.6, delay: i * 0.08, ease: EXPO },
   }),
 };
 
 const scaleIn = {
-  hidden: { opacity: 0, scale: 0.85 },
-  visible: (i: number = 0) => ({
+  hidden: { opacity: 0, scale: 0.94 },
+  visible: {
     opacity: 1,
     scale: 1,
-    transition: { duration: 0.5, delay: i * 0.12, ease: EASE_OUT_EXPO },
-  }),
+    transition: { duration: 0.7, ease: EXPO },
+  },
 };
 
-// ─── Animated Counter ──────────────────────────────────────────────
 function AnimatedCounter({ target, suffix = "" }: { target: number; suffix?: string }) {
   const [count, setCount] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
+  const ref = useRef(null);
   const inView = useInView(ref, { once: true });
 
   useEffect(() => {
     if (!inView) return;
     let start = 0;
-    const duration = 1800;
+    const duration = 1400;
     const step = 16;
-    const increment = target / (duration / step);
+    const totalSteps = duration / step;
+    const increment = target / totalSteps;
+
     const timer = setInterval(() => {
       start += increment;
       if (start >= target) {
         setCount(target);
         clearInterval(timer);
       } else {
-        setCount(Math.floor(start));
+        setCount(Number(start.toFixed(target % 1 === 0 ? 0 : 1)));
       }
     }, step);
+
     return () => clearInterval(timer);
   }, [inView, target]);
 
-  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+  return (
+    <span ref={ref}>
+      {count}
+      {suffix}
+    </span>
+  );
 }
 
-// ─── Section Wrapper with InView ──────────────────────────────────
-function InViewSection({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, margin: "-80px" });
+// ── Demo Medical Pass Front & Back for CardFlip ──────────────────────────────
+const DEMO_QR = buildQrPath(QR_SIZE, 54321);
+
+function MedicalPassFront() {
+  const { isDark } = useTheme();
   return (
-    <div ref={ref} className={className} style={{ opacity: inView ? 1 : 0, transition: "opacity 0.1s" }}>
-      {children}
+    <div className={`flex h-full flex-col justify-between p-5 select-none ${isDark ? "bg-zinc-900 text-white" : "bg-white text-zinc-900"}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-6 rounded-lg bg-[#314E43] flex items-center justify-center text-white text-xs font-bold">
+            ✚
+          </div>
+          <span className={`font-semibold text-[10px] uppercase tracking-wider ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
+            MediQueue Pass
+          </span>
+        </div>
+        <span className="rounded-full bg-emerald-50 dark:bg-emerald-950 px-2 py-0.5 font-bold text-[9px] text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+          ● Ready to Scan
+        </span>
+      </div>
+
+      <div className="my-auto text-center py-2">
+        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-widest block mb-0.5">
+          Your Queue Token
+        </span>
+        <div className={`text-4xl sm:text-5xl font-mono font-bold tracking-tight ${isDark ? "text-white" : "text-zinc-900"}`}>
+          #A-42
+        </div>
+        <p className={`text-xs mt-1 ${isDark ? "text-zinc-400" : "text-zinc-500"}`}>
+          OPD Counter 3 · Dr. Sarah Jenkins
+        </p>
+      </div>
+
+      <div className={`grid grid-cols-3 gap-1 text-center py-2 rounded-xl border ${isDark ? "bg-zinc-800/80 border-zinc-700" : "bg-zinc-50 border-zinc-100"}`}>
+        <div>
+          <span className="text-[9px] text-zinc-400 uppercase tracking-wider block">Est. Wait</span>
+          <span className="font-bold text-xs text-emerald-600">~12 min</span>
+        </div>
+        <div>
+          <span className="text-[9px] text-zinc-400 uppercase tracking-wider block">Ahead</span>
+          <span className={`font-bold text-xs ${isDark ? "text-white" : "text-zinc-800"}`}>3 patients</span>
+        </div>
+        <div>
+          <span className="text-[9px] text-zinc-400 uppercase tracking-wider block">Room</span>
+          <span className={`font-bold text-xs ${isDark ? "text-white" : "text-zinc-800"}`}>OPD 204</span>
+        </div>
+      </div>
+
+      <div className="-mx-5 my-2 border-t border-dashed border-zinc-200 dark:border-zinc-800 relative">
+        <div className={`absolute -left-2 -top-2 w-4 h-4 rounded-full border-r ${isDark ? "bg-zinc-950 border-zinc-800" : "bg-zinc-100 border-zinc-200"}`} />
+        <div className={`absolute -right-2 -top-2 w-4 h-4 rounded-full border-l ${isDark ? "bg-zinc-950 border-zinc-800" : "bg-zinc-100 border-zinc-200"}`} />
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-zinc-500 pt-0.5">
+        <span className="flex items-center gap-1 font-semibold text-blue-600">
+          <QrCode className="w-3.5 h-3.5" />
+          Flip for Kiosk QR →
+        </span>
+        <span className="font-mono text-zinc-400 text-[10px]">Tap to flip</span>
+      </div>
     </div>
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────────
+function MedicalPassBack() {
+  return (
+    <div className="flex h-full flex-col justify-between p-5 bg-zinc-950 text-white select-none">
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-[10px] text-zinc-400 uppercase tracking-[0.14em]">
+          Check-in QR Code
+        </span>
+        <span className="font-mono text-xs text-blue-400 font-semibold">
+          #A-42
+        </span>
+      </div>
+
+      <div className="mx-auto my-auto flex flex-col items-center">
+        <div className="rounded-2xl bg-white p-3 shadow-2xl ring-2 ring-white/10">
+          <svg
+            aria-label="Patient Check-in QR Code"
+            className="block h-28 w-28 sm:h-32 sm:w-32"
+            role="img"
+            shapeRendering="crispEdges"
+            viewBox={`0 0 ${QR_SIZE} ${QR_SIZE}`}
+          >
+            <path d={DEMO_QR} fill="#09090b" />
+          </svg>
+        </div>
+        <p className="mt-2 text-[10px] uppercase font-mono tracking-widest text-zinc-400">
+          Hold against kiosk scanner
+        </p>
+      </div>
+
+      <dl className="grid grid-cols-3 gap-1 text-center py-2 border-t border-zinc-800 text-[10px]">
+        <div>
+          <dt className="text-zinc-500 uppercase">Token</dt>
+          <dd className="font-bold text-zinc-200">A-42</dd>
+        </div>
+        <div>
+          <dt className="text-zinc-500 uppercase">Gate</dt>
+          <dd className="font-bold text-zinc-200">OPD 3</dd>
+        </div>
+        <div>
+          <dt className="text-zinc-500 uppercase">SMS Alert</dt>
+          <dd className="font-bold text-emerald-400">Active</dd>
+        </div>
+      </dl>
+
+      <p className="text-[10px] text-zinc-400 text-center leading-snug">
+        Scan at clinic turnstile or waiting kiosk to activate your live buzzer.
+      </p>
+    </div>
+  );
+}
+
+// ── Doctor Accounts & Menu Items for KokonutUI ProfileDropdown ───────────────
+const DOCTOR_ACCOUNTS: Account[] = [
+  {
+    id: "doc-1",
+    name: "Dr. Sarah Jenkins",
+    email: "s.jenkins@mediqueue.org",
+    initials: "SJ",
+    plan: "Chief Cardiologist",
+  },
+  {
+    id: "doc-2",
+    name: "Dr. Marcus Vance",
+    email: "m.vance@mediqueue.org",
+    initials: "MV",
+    plan: "Senior Neurologist",
+  },
+];
+
+const DOCTOR_MENU_ITEMS: ProfileMenuItem[] = [
+  {
+    label: "View Qualifications",
+    icon: <Award className="w-4 h-4" />,
+    onSelect: () => alert("Dr. Sarah Jenkins, MD, FACC (Harvard Medical School, 15+ years)"),
+  },
+  {
+    label: "Clinic Consultation Hours",
+    icon: <Clock className="w-4 h-4" />,
+    value: "9am - 5pm",
+    onSelect: () => alert("Mon - Fri: 09:00 AM - 05:00 PM (OPD Room 204)"),
+  },
+  {
+    label: "Medical Credentials",
+    icon: <ShieldCheck className="w-4 h-4" />,
+    value: "Verified",
+    onSelect: () => alert("Verified by American Board of Medical Specialties #84920"),
+  },
+];
+
+const DOCTORS = [
+  {
+    name: "Dr. Sarah Jenkins",
+    specialty: "Cardiology",
+    exp: "15+ yrs",
+    rating: "4.9",
+    slots: "Next: Today 4:30 PM",
+    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400",
+  },
+  {
+    name: "Dr. Marcus Vance",
+    specialty: "Neurology",
+    exp: "12+ yrs",
+    rating: "4.9",
+    slots: "Next: Tomorrow 10:00 AM",
+    image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400",
+  },
+  {
+    name: "Dr. Elena Rostova",
+    specialty: "Pediatrics",
+    exp: "10+ yrs",
+    rating: "5.0",
+    slots: "Next: Today 6:00 PM",
+    image: "https://images.unsplash.com/photo-1594824813637-2354c41461ff?auto=format&fit=crop&q=80&w=400",
+  },
+];
+
+// ── Main Page Component ───────────────────────────────────────────────────────
 export default function HomePage() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut } = useClerk();
+  const router = useRouter();
+  const { isDark } = useTheme();
   const role = user?.publicMetadata?.role as string | undefined;
   const [scrolled, setScrolled] = useState(false);
+  const [activeDept, setActiveDept] = useState("Primary Care");
+  const [isPassFlipped, setIsPassFlipped] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [dashboardMenuOpen, setDashboardMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -105,449 +302,1135 @@ export default function HomePage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  if (!isLoaded) {
+  // Redirect admin and doctor away from landing page
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !user) return;
+    const userRole = user?.publicMetadata?.role as string | undefined;
+    if (userRole === "admin") {
+      router.replace("/admin");
+    } else if (userRole === "doctor") {
+      router.replace("/doctor");
+    }
+  }, [isLoaded, isSignedIn, user, router]);
+
+  if (!isLoaded || (isSignedIn && (role === "admin" || role === "doctor"))) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#F8FAFC" }}>
+      <div className={`min-h-screen flex items-center justify-center ${isDark ? "bg-[#090D16]" : "bg-[#FAF8F5]"}`}>
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-          className="w-12 h-12 rounded-full border-2 border-transparent"
-          style={{ borderTopColor: "#2563EB", borderRightColor: "#7C3AED" }}
+          className="w-10 h-10 rounded-full border-2 border-transparent"
+          style={{ borderTopColor: "#2563EB" }}
         />
       </div>
     );
   }
 
-  return (
-    <div className="min-h-screen animated-gradient-bg overflow-x-hidden">
+  const DEPARTMENTS = [
+    { name: "Primary Care", icon: HeartPulse },
+    { name: "Women's Health", icon: Users },
+    { name: "Pediatrics", icon: Activity },
+    { name: "Cardiology", icon: Stethoscope },
+    { name: "Dermatology", icon: Brain },
+  ];
 
-      {/* ── Navbar ─────────────────────────────────────── */}
-      <motion.header
-        initial={{ y: -80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+  const getDashboardLink = () => {
+    if (role === "admin") return "/admin";
+    if (role === "doctor") return "/doctor";
+    return "/dashboard";
+  };
+
+  return (
+    <div
+      className={`min-h-screen ${
+        isDark ? "bg-[#090D16] text-zinc-100" : "bg-[#FAF8F5] text-zinc-900"
+      } overflow-x-hidden font-sans transition-colors duration-300 relative`}
+    >
+      {/* ── Navbar ──────────────────────────────────────────────────────── */}
+      <header
+        className={`fixed top-0 inset-x-0 z-40 transition-all duration-300 ${
           scrolled
-            ? "py-3 shadow-lg shadow-blue-500/10"
-            : "py-5"
+            ? isDark
+              ? "bg-[#090D16]/95 border-b border-zinc-800 backdrop-blur-md"
+              : "bg-[#FAF8F5]/95 border-b border-[#EBE5DC] backdrop-blur-md"
+            : "bg-transparent"
         }`}
-        style={{
-          background: scrolled
-            ? "rgba(255,255,255,0.85)"
-            : "rgba(255,255,255,0.6)",
-          backdropFilter: "blur(20px)",
-          WebkitBackdropFilter: "blur(20px)",
-          borderBottom: scrolled ? "1px solid rgba(229,231,235,0.8)" : "1px solid transparent",
-        }}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5 group">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-blue-500/30 transition-shadow duration-300"
-              style={{ background: "linear-gradient(135deg, #2563EB, #7C3AED)" }}
-            >
-              <HeartPulse className="h-5 w-5 text-white" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          {/* Logo matching inspiration: Medical cross icon + "medical logo" */}
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-[#314E43] flex items-center justify-center text-white shadow-xs">
+              <span className="font-bold text-base leading-none">✚</span>
             </div>
             <span
-              className="text-xl font-bold"
-              style={{
-                background: "linear-gradient(135deg, #2563EB, #7C3AED)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
+              className={`font-semibold text-lg tracking-tight ${
+                isDark ? "text-white" : "text-[#1E293B]"
+              }`}
             >
-              MediQueue Pro
+              Medical Logo
             </span>
           </Link>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8">
-            {/* Dashboards Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setDashboardMenuOpen(!dashboardMenuOpen)}
-                className="nav-link text-sm font-medium flex items-center gap-1.5"
+          {/* Nav links matching inspiration */}
+          <nav className="hidden md:flex items-center gap-7">
+            {["Doctors", "Services", "About", "Reviews"].map((item) => (
+              <a
+                key={item}
+                href={`#${item.toLowerCase()}`}
+                className={`text-sm font-medium transition-colors ${
+                  isDark
+                    ? "text-zinc-400 hover:text-white"
+                    : "text-zinc-600 hover:text-zinc-950"
+                }`}
               >
-                <LayoutDashboard className="h-4 w-4" />
-                Dashboards
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${dashboardMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              <AnimatePresence>
-                {dashboardMenuOpen && isSignedIn && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute top-full left-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 py-2 z-50"
-                  >
-                    {role === 'patient' && (
-                      <Link href="/dashboard" className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors rounded-lg mx-1" onClick={() => setDashboardMenuOpen(false)}>
-                        <Users className="h-4 w-4" />
-                        User Dashboard
-                      </Link>
-                    )}
-                    {role === 'admin' && (
-                      <Link href="/admin" className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors rounded-lg mx-1" onClick={() => setDashboardMenuOpen(false)}>
-                        <Hospital className="h-4 w-4" />
-                        Admin Dashboard
-                      </Link>
-                    )}
-                    {role === 'doctor' && (
-                      <Link href="/doctor" className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors rounded-lg mx-1" onClick={() => setDashboardMenuOpen(false)}>
-                        <Stethoscope className="h-4 w-4" />
-                        Doctor Dashboard
-                      </Link>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                {item}
+              </a>
+            ))}
+            <a
+              href="#contact"
+              className={`text-sm font-medium transition-colors flex items-center gap-1 ${
+                isDark
+                  ? "text-zinc-400 hover:text-white"
+                  : "text-zinc-600 hover:text-zinc-950"
+              }`}
+            >
+              <PhoneCall className="w-3.5 h-3.5 text-zinc-400" />
+              Contact
+            </a>
+          </nav>
 
-            {isSignedIn ? null : (
+          {/* Action buttons + SunMoonThemeToggle + KokonutUI ProfileDropdown + Mobile Menu Button */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <SunMoonThemeToggle size={36} />
+            {isSignedIn ? (
               <>
-                <Link href="/sign-in" className="nav-link text-sm font-medium">
+                <Link
+                  href={getDashboardLink()}
+                  className={`hidden sm:flex items-center gap-1.5 text-sm font-medium transition-colors mr-1 ${
+                    isDark
+                      ? "text-zinc-300 hover:text-white"
+                      : "text-zinc-700 hover:text-zinc-900"
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4 text-zinc-500" />
+                  Dashboard
+                </Link>
+                {/* KokonutUI ProfileDropdown for authenticated user */}
+                <ProfileDropdown
+                  accounts={[
+                    {
+                      id: "current-user",
+                      name: user?.fullName || "Patient Account",
+                      email: user?.primaryEmailAddress?.emailAddress || "patient@mediqueue.org",
+                      plan: role === "admin" ? "Admin" : role === "doctor" ? "Doctor" : "Patient Pass",
+                    },
+                  ]}
+                  onSignOut={async () => {
+                    try {
+                      await signOut({ redirectUrl: "/" });
+                    } catch {
+                      router.push("/");
+                    }
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/sign-in"
+                  className={`hidden sm:inline-block text-sm font-medium transition-colors px-3 py-2 ${
+                    isDark
+                      ? "text-zinc-300 hover:text-white"
+                      : "text-zinc-700 hover:text-zinc-950"
+                  }`}
+                >
                   Sign In
                 </Link>
                 <Link
-                  href="/sign-up"
-                  className="ripple inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-md hover:shadow-lg hover:scale-105 transition-all duration-300"
-                  style={{ background: "linear-gradient(135deg, #2563EB, #7C3AED)" }}
+                  href="/book-appointment"
+                  className="px-3 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold text-white shadow-sm transition-all hover:opacity-95 hover:scale-[1.02] whitespace-nowrap"
+                  style={{ background: "#1F2D3D" }}
                 >
-                  Get Started
-                  <ChevronRight className="h-4 w-4" />
+                  Book Appointment
                 </Link>
               </>
             )}
-          </nav>
 
-          {/* Mobile menu button */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          >
-            <div className="w-5 h-0.5 bg-gray-700 mb-1 transition-all" style={{ transform: mobileMenuOpen ? "rotate(45deg) translate(3px, 3px)" : "" }} />
-            <div className="w-5 h-0.5 bg-gray-700 mb-1 transition-all" style={{ opacity: mobileMenuOpen ? 0 : 1 }} />
-            <div className="w-5 h-0.5 bg-gray-700 transition-all" style={{ transform: mobileMenuOpen ? "rotate(-45deg) translate(3px, -3px)" : "" }} />
-          </button>
+            {/* Mobile Hamburger Toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className={`md:hidden p-2 rounded-xl transition-colors cursor-pointer ${
+                isDark ? "hover:bg-zinc-800 text-zinc-300" : "hover:bg-zinc-200/60 text-zinc-700"
+              }`}
+              aria-label="Toggle navigation menu"
+            >
+              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
         </div>
 
-        {/* Mobile menu */}
+        {/* Mobile Navigation Drawer */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              className="md:hidden overflow-hidden border-t border-gray-100 bg-white/95 backdrop-blur-xl"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className={`md:hidden border-b px-4 py-4 space-y-3 transition-colors ${
+                isDark
+                  ? "bg-[#090D16]/95 border-zinc-800 text-zinc-200"
+                  : "bg-[#FAF8F5]/98 border-[#EBE5DC] text-zinc-800"
+              } backdrop-blur-xl shadow-xl`}
             >
-              <div className="px-4 py-4 flex flex-col gap-2">
-                {isSignedIn && role && (
-                  <>
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider px-2 mb-1">Dashboards</p>
-                    {role === 'patient' && (
-                      <Link href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                        <Users className="h-4 w-4" /> User Dashboard
-                      </Link>
-                    )}
-                    {role === 'admin' && (
-                      <Link href="/admin" className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                        <Hospital className="h-4 w-4" /> Admin Dashboard
-                      </Link>
-                    )}
-                    {role === 'doctor' && (
-                      <Link href="/doctor" className="flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                        <Stethoscope className="h-4 w-4" /> Doctor Dashboard
-                      </Link>
-                    )}
-                  </>
-                )}
+              <nav className="flex flex-col gap-1">
+                {["Doctors", "Services", "About", "Reviews"].map((item) => (
+                  <a
+                    key={item}
+                    href={`#${item.toLowerCase()}`}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      isDark
+                        ? "hover:bg-zinc-800/80 hover:text-white"
+                        : "hover:bg-[#EBE5DC]/60 hover:text-zinc-950"
+                    }`}
+                  >
+                    {item}
+                  </a>
+                ))}
+                <a
+                  href="#contact"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                    isDark
+                      ? "hover:bg-zinc-800/80 hover:text-white"
+                      : "hover:bg-[#EBE5DC]/60 hover:text-zinc-950"
+                  }`}
+                >
+                  <PhoneCall className="w-4 h-4 text-emerald-500" />
+                  Contact
+                </a>
                 {!isSignedIn && (
-                  <>
-                    <div className="border-t border-gray-100 my-1" />
-                    <Link href="/sign-in" className="px-3 py-2.5 text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                      Sign In
-                    </Link>
-                    <Link
-                      href="/sign-up"
-                      className="inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
-                      style={{ background: "linear-gradient(135deg, #2563EB, #7C3AED)" }}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Get Started
-                      <ChevronRight className="h-4 w-4" />
-                    </Link>
-                  </>
-                )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.header>
-
-      {/* ── Hero Section ───────────────────────────────── */}
-      <section className="relative pt-36 pb-28 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Background blobs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div
-            className="animate-blob absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-25 blur-3xl"
-            style={{ background: "radial-gradient(circle, #2563EB, #3B82F6)" }}
-          />
-          <div
-            className="animate-blob-2 animation-delay-2000 absolute top-20 right-0 w-80 h-80 rounded-full opacity-20 blur-3xl"
-            style={{ background: "radial-gradient(circle, #7C3AED, #A855F7)" }}
-          />
-          <div
-            className="animate-blob animation-delay-4000 absolute -bottom-20 left-1/3 w-72 h-72 rounded-full opacity-15 blur-3xl"
-            style={{ background: "radial-gradient(circle, #2563EB, #7C3AED)" }}
-          />
-          {/* Grid pattern overlay */}
-          <div
-            className="absolute inset-0 opacity-30"
-            style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%232563EB' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-            }}
-          />
-        </div>
-
-        <div className="relative max-w-7xl mx-auto">
-          {/* Badge */}
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            custom={0}
-            className="flex justify-center mb-8"
-          >
-            <div
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold border shadow-sm"
-              style={{
-                background: "rgba(37,99,235,0.08)",
-                borderColor: "rgba(37,99,235,0.2)",
-                color: "#2563EB",
-              }}
-            >
-              <Sparkles className="h-4 w-4" />
-              AI-Powered Healthcare Platform
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            </div>
-          </motion.div>
-
-          {/* Headline */}
-          <div className="text-center max-w-5xl mx-auto">
-            <motion.h1
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={1}
-              className="text-5xl md:text-7xl font-black leading-[1.05] tracking-tight mb-6"
-              style={{ color: "#0F172A" }}
-            >
-              Smart Hospital{" "}
-              <span
-                style={{
-                  background: "linear-gradient(135deg, #2563EB 0%, #7C3AED 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}
-              >
-                Queue Management
-              </span>
-            </motion.h1>
-
-            <motion.p
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={2}
-              className="text-lg md:text-xl leading-relaxed max-w-2xl mx-auto mb-10"
-              style={{ color: "#64748B" }}
-            >
-              Experience seamless hospital visits with intelligent queue tracking,
-              appointment booking, and digital waiting rooms — all in one place.
-            </motion.p>
-
-            {/* CTA Buttons */}
-            <motion.div
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              custom={3}
-              className="flex flex-wrap items-center justify-center gap-4"
-            >
-              {isSignedIn ? (
-                <>
-                  <Link
-                    href="/join-queue"
-                    className="ripple group inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-base font-semibold text-white shadow-lg hover:shadow-blue-500/40 hover:scale-105 active:scale-95 transition-all duration-300"
-                    style={{ background: "linear-gradient(135deg, #2563EB, #1D4ED8)" }}
-                  >
-                    <Users className="h-5 w-5" />
-                    Join Queue
-                    <span className="group-hover:translate-x-0.5 transition-transform duration-200">
-                      <ChevronRight className="h-4 w-4" />
-                    </span>
-                  </Link>
-
-                  <Link
-                    href="/book-appointment"
-                    className="ripple group inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-base font-semibold text-white shadow-lg hover:shadow-purple-500/40 hover:scale-105 active:scale-95 transition-all duration-300"
-                    style={{ background: "linear-gradient(135deg, #7C3AED, #6D28D9)" }}
-                  >
-                    <Calendar className="h-5 w-5" />
-                    Book Appointment
-                  </Link>
-
-                  <Link
-                    href="/digital-waiting-room"
-                    className="ripple group inline-flex items-center gap-2 px-7 py-3.5 rounded-2xl text-base font-semibold text-white shadow-lg hover:shadow-green-500/40 hover:scale-105 active:scale-95 transition-all duration-300"
-                    style={{ background: "linear-gradient(135deg, #10B981, #059669)" }}
-                  >
-                    <Activity className="h-5 w-5" />
-                    Waiting Room
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/sign-up"
-                    className="ripple group inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-base font-semibold text-white shadow-xl hover:shadow-blue-500/50 hover:scale-105 active:scale-95 transition-all duration-300"
-                    style={{ background: "linear-gradient(135deg, #2563EB, #7C3AED)" }}
-                  >
-                    <Zap className="h-5 w-5" />
-                    Get Started — Free
-                    <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                  </Link>
                   <Link
                     href="/sign-in"
-                    className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl text-base font-semibold border-2 hover:scale-105 active:scale-95 transition-all duration-300"
-                    style={{ borderColor: "#E5E7EB", color: "#0F172A", background: "white" }}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="mt-2 px-4 py-2.5 rounded-xl text-center text-sm font-medium border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   >
                     Sign In
                   </Link>
-                </>
-              )}
+                )}
+                {isSignedIn && (
+                  <Link
+                    href={getDashboardLink()}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="mt-2 px-4 py-2.5 rounded-xl text-center text-sm font-medium bg-[#314E43] text-white"
+                  >
+                    Go to Dashboard
+                  </Link>
+                )}
+              </nav>
             </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
 
-          </div>
-
-          {/* Floating UI preview card */}
-          <motion.div
-            variants={fadeUp}
-            initial="hidden"
-            animate="visible"
-            custom={5}
-            className="mt-20 max-w-3xl mx-auto"
-          >
-            <div
-              className="animate-float rounded-3xl shadow-2xl overflow-hidden border"
-              style={{ borderColor: "rgba(229,231,235,0.5)", background: "white" }}
-            >
-              {/* Fake browser chrome */}
-              <div className="px-4 py-3 flex items-center gap-2 border-b" style={{ borderColor: "#F1F5F9", background: "#F8FAFC" }}>
-                <div className="w-3 h-3 rounded-full bg-red-400" />
-                <div className="w-3 h-3 rounded-full bg-yellow-400" />
-                <div className="w-3 h-3 rounded-full bg-green-400" />
-                <div className="flex-1 mx-4 py-1 px-3 rounded-lg text-xs text-gray-400 font-mono" style={{ background: "white", border: "1px solid #E5E7EB" }}>
-                  mediqueue.pro/dashboard
-                </div>
+      {/* ── Hero Section (Faithfully matching the inspiration layout) ─────── */}
+      <section className="relative pt-28 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-10 items-center">
+            {/* Left column: Typography, Tagline, CTAs, Ratings */}
+            <div className="lg:col-span-7 pt-4">
+              {/* KokonutUI SplitFlapText – Animated departure board tagline */}
+              <div className="mb-4">
+                <SplitFlapText
+                  words={[
+                    "ZERO WAIT TIME",
+                    "BOOK IN SECONDS",
+                    "INSTANT QR PASS",
+                    "AI POWERED CARE",
+                  ]}
+                  interval={3600}
+                  tileClassName={isDark ? "bg-zinc-800 text-white" : "bg-[#1E293B] text-white"}
+                />
               </div>
-              {/* Dashboard preview */}
-              <div className="p-6" style={{ background: "#F8FAFC" }}>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                  {[
-                    { label: "In Queue", val: "42", color: "#2563EB" },
-                    { label: "Served Today", val: "187", color: "#10B981" },
-                    { label: "Avg Wait", val: "14m", color: "#7C3AED" },
-                  ].map((s) => (
-                    <div key={s.label} className="rounded-2xl p-4 bg-white shadow-sm border" style={{ borderColor: "#E5E7EB" }}>
-                      <div className="text-xs font-medium mb-1" style={{ color: "#64748B" }}>{s.label}</div>
-                      <div className="text-2xl font-bold" style={{ color: s.color }}>{s.val}</div>
-                    </div>
-                  ))}
+
+              {/* KokonutUI MarkerText – Hand-drawn animated marks on headline */}
+              <MarkerText className={isDark ? "text-white" : "text-[#13221C]"}>
+                <h1
+                  className={`text-5xl sm:text-6xl font-serif font-normal tracking-tight leading-[1.08] mb-5 ${
+                    isDark ? "text-white" : "text-[#13221C]"
+                  }`}
+                >
+                  Expert Care,<br />
+                  <Mark color={isDark ? "#1E3B2F" : "#D8E8DD"} type="highlight">Designed Around</Mark><br />
+                  You
+                </h1>
+              </MarkerText>
+
+              {/* Subtext matching inspiration */}
+              <p
+                className={`text-base sm:text-lg leading-relaxed mb-7 max-w-lg ${
+                  isDark ? "text-zinc-300" : "text-[#556960]"
+                }`}
+              >
+                Reassuring and ask your healthcare, professional commuter well care healthier cancel you.
+                Modern digital queueing so you spend less time waiting and more time healing.
+              </p>
+
+              {/* CTA buttons matching inspiration */}
+              <div className="flex flex-wrap items-center gap-3.5 mb-10">
+                <Link
+                  href="/book-appointment"
+                  className="px-6 py-3 rounded-full text-sm font-semibold text-white shadow-sm transition-all hover:scale-105"
+                  style={{ background: isDark ? "#2563EB" : "#1F2D3D" }}
+                >
+                  Book an Appointment
+                </Link>
+                <a
+                  href="#doctors"
+                  className={`inline-flex items-center gap-1.5 text-sm font-semibold transition-colors py-2 px-1 ${
+                    isDark ? "text-blue-400 hover:text-blue-300" : "text-[#1F2D3D] hover:text-[#314E43]"
+                  }`}
+                >
+                  Meet Our Doctors →
+                </a>
+              </div>
+
+              {/* Social proof stats matching inspiration */}
+              <div
+                className={`flex flex-wrap items-center gap-8 pt-4 border-t ${
+                  isDark ? "border-zinc-800" : "border-[#EAE3D9]"
+                }`}
+              >
+                <div>
+                  <div
+                    className={`flex items-center gap-1 text-xl font-bold ${
+                      isDark ? "text-white" : "text-[#1F2D3D]"
+                    }`}
+                  >
+                    <AnimatedCounter target={4.9} suffix="" />
+                    <span>/5</span>
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400 ml-0.5" />
+                  </div>
+                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-[#6F7F77]"}`}>
+                    patient rating
+                  </p>
                 </div>
-                <div className="rounded-2xl p-4 bg-white shadow-sm border" style={{ borderColor: "#E5E7EB" }}>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-semibold" style={{ color: "#0F172A" }}>Live Queue</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: "#DCFCE7", color: "#16A34A" }}>● Live</span>
-                  </div>
-                  <div className="space-y-2">
-                    {["Dr. Sharma — Cardiology", "Dr. Patel — Neurology", "Dr. Khan — Orthopedics"].map((d, i) => (
-                      <div key={d} className="flex items-center gap-3 text-sm">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: `linear-gradient(135deg, #2563EB, #7C3AED)` }}>
-                          {i + 1}
-                        </div>
-                        <span style={{ color: "#0F172A" }}>{d}</span>
-                        <span className="ml-auto text-xs" style={{ color: "#64748B" }}>{[5, 12, 8][i]} waiting</span>
-                      </div>
-                    ))}
-                  </div>
+                <div className={`w-px h-8 ${isDark ? "bg-zinc-800" : "bg-[#EAE3D9]"}`} />
+                <div>
+                  <p className={`text-xl font-bold ${isDark ? "text-white" : "text-[#1F2D3D]"}`}>
+                    <AnimatedCounter target={15} suffix="+" />
+                  </p>
+                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-[#6F7F77]"}`}>
+                    experience
+                  </p>
+                </div>
+                <div className={`w-px h-8 ${isDark ? "bg-zinc-800" : "bg-[#EAE3D9]"}`} />
+                <div>
+                  <p className={`text-xl font-bold ${isDark ? "text-white" : "text-[#1F2D3D]"}`}>
+                    <AnimatedCounter target={10000} suffix="+" />
+                  </p>
+                  <p className={`text-xs ${isDark ? "text-zinc-400" : "text-[#6F7F77]"}`}>
+                    patients cared for
+                  </p>
                 </div>
               </div>
             </div>
-          </motion.div>
+
+            {/* Right column: Doctor portrait with floating availability badge */}
+            <motion.div
+              variants={scaleIn}
+              initial="hidden"
+              animate="visible"
+              className="lg:col-span-5 relative flex justify-center"
+            >
+              <div className="relative w-full max-w-[380px]">
+                {/* Doctor Portrait Image container */}
+                <div
+                  className={`relative aspect-[4/5] rounded-[2.5rem] overflow-hidden shadow-2xl border-4 ${
+                    isDark ? "border-zinc-800 bg-zinc-800" : "border-white bg-[#EAE4DC]"
+                  }`}
+                >
+                  <img
+                    src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=800"
+                    alt="Doctor"
+                    className="w-full h-full object-cover object-top"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none" />
+                </div>
+
+                {/* Floating availability badge matching inspiration */}
+                <div
+                  className={`absolute -bottom-3 left-4 sm:-left-4 rounded-2xl p-3 pr-4 shadow-xl border flex items-center gap-3 ${
+                    isDark
+                      ? "bg-zinc-900 border-zinc-800 text-white"
+                      : "bg-white border-zinc-100 text-zinc-900"
+                  }`}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-[#E8EFEA] dark:bg-emerald-950 flex items-center justify-center text-[#2D5A46] dark:text-emerald-400">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                      Next available
+                    </span>
+                    <span className="text-xs sm:text-sm font-bold">
+                      Today, 4:30 PM
+                    </span>
+                  </div>
+                </div>
+
+                {/* Live Queue mini indicator */}
+                <div className="absolute -top-3 right-4 bg-emerald-600 text-white rounded-full px-3 py-1 shadow-md text-xs font-semibold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                  Live OPD Active
+                </div>
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
-      {/* ── Footer ─────────────────────────────────────── */}
-      <footer className="py-16 px-4 sm:px-6 lg:px-8 border-t" style={{ borderColor: "#E5E7EB", background: "#0F172A" }}>
+      {/* ── Department Filter Bar (Matching Inspiration Pill Tabs) ────────── */}
+      <section className="py-6 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-12">
-            {/* Brand */}
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2.5 mb-4">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #2563EB, #7C3AED)" }}>
-                  <HeartPulse className="h-5 w-5 text-white" />
+          <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-none">
+            {DEPARTMENTS.map((dept) => {
+              const Icon = dept.icon;
+              const isSelected = activeDept === dept.name;
+              return (
+                <button
+                  key={dept.name}
+                  onClick={() => setActiveDept(dept.name)}
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all cursor-pointer ${
+                    isSelected
+                      ? isDark
+                        ? "bg-blue-600 text-white shadow-xs font-semibold"
+                        : "bg-[#D6E5DC] text-[#1E3B2F] shadow-xs font-semibold"
+                      : isDark
+                      ? "bg-zinc-800/60 text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                      : "bg-transparent text-[#5B6D63] hover:bg-white/60"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {dept.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Services Section (Matching Inspiration) ───────────────────────── */}
+      <section id="services" className="py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-10">
+            <h2
+              className={`text-3xl font-serif font-normal ${
+                isDark ? "text-white" : "text-[#13221C]"
+              }`}
+            >
+              Services
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                title: "Primary Care",
+                desc: "Comprehensive outpatient examinations, preventive diagnostics, and individualized wellness protocols.",
+                dept: "Primary Care",
+              },
+              {
+                title: "Women's Health",
+                desc: "Expert gynecological care, maternal screening, oncology prevention, and reproductive health.",
+                dept: "Women's Health",
+              },
+              {
+                title: "Cardiology",
+                desc: "Advanced cardiac telemetry, ECG monitoring, hypertension management, and interventional cardiology.",
+                dept: "Cardiology",
+              },
+            ].map((srv, i) => (
+              <motion.div
+                key={srv.title}
+                variants={fadeUp}
+                initial="hidden"
+                whileInView="visible"
+                custom={i}
+                viewport={{ once: true }}
+                className={`rounded-2xl p-7 border shadow-xs hover:shadow-md transition-all flex flex-col justify-between ${
+                  isDark
+                    ? "bg-zinc-900/90 border-zinc-800 hover:border-zinc-700"
+                    : "bg-white/80 border-[#ECE5DB] hover:border-zinc-300"
+                }`}
+              >
+                <div>
+                  <h3
+                    className={`text-xl font-serif mb-3 ${
+                      isDark ? "text-white" : "text-[#13221C]"
+                    }`}
+                  >
+                    {srv.title}
+                  </h3>
+                  <p
+                    className={`text-sm leading-relaxed mb-8 ${
+                      isDark ? "text-zinc-400" : "text-[#66776F]"
+                    }`}
+                  >
+                    {srv.desc}
+                  </p>
                 </div>
-                <span className="text-xl font-bold text-white">MediQueue Pro</span>
+                <Link
+                  href="/book-appointment"
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors ${
+                    isDark ? "text-blue-400 hover:text-blue-300" : "text-[#1F2D3D] hover:text-[#2D5A46]"
+                  }`}
+                >
+                  Learn more →
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Trust Section (Faithfully matching inspiration with Profile Dropdown!) ── */}
+      <section id="reviews" className="py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-10">
+            <h2
+              className={`text-3xl font-serif font-normal ${
+                isDark ? "text-white" : "text-[#13221C]"
+              }`}
+            >
+              Trust
+            </h2>
+          </div>
+
+          <div className="grid lg:grid-cols-3 gap-6">
+            {/* Card 1: Doctor Profile Card */}
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              className={`rounded-2xl p-6 border shadow-xs flex flex-col sm:flex-row gap-5 items-start relative ${
+                isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-[#ECE5DB]"
+              }`}
+            >
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden shrink-0 bg-zinc-200 border border-zinc-100 shadow-xs">
+                <img
+                  src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=300"
+                  alt="Doctor Name"
+                  className="w-full h-full object-cover object-top"
+                />
               </div>
-              <p className="text-sm leading-relaxed mb-6" style={{ color: "#94A3B8" }}>
-                The most advanced hospital queue management system. Designed for modern healthcare institutions.
+
+              <div className="flex-1 min-w-0">
+                <h3
+                  className={`font-serif text-lg font-bold truncate ${
+                    isDark ? "text-white" : "text-[#13221C]"
+                  }`}
+                >
+                  Doctor Name, MnD
+                </h3>
+                <p className={`text-xs mt-0.5 ${isDark ? "text-zinc-400" : "text-[#6F7F77]"}`}>
+                  Medical Credentials, MED
+                </p>
+                <p className={`text-xs ${isDark ? "text-zinc-400" : "text-[#6F7F77]"}`}>
+                  Specialty, Physician
+                </p>
+                <p className={`text-xs mb-4 ${isDark ? "text-zinc-400" : "text-[#6F7F77]"}`}>
+                  Years of experience
+                </p>
+
+                {/* KokonutUI ProfileDropdown for "View Profile"! */}
+                <ProfileDropdown
+                  triggerLabel="View Profile"
+                  triggerClassName={
+                    isDark
+                      ? "bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700 text-xs font-semibold px-3 py-1.5 rounded-lg shadow-xs"
+                      : "bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50 hover:border-zinc-300 shadow-xs text-xs font-semibold px-3 py-1.5 rounded-lg"
+                  }
+                  accounts={DOCTOR_ACCOUNTS}
+                  items={DOCTOR_MENU_ITEMS}
+                  defaultStatus="online"
+                />
+              </div>
+            </motion.div>
+
+            {/* Card 2: Patient Review 1 */}
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="visible"
+              custom={1}
+              viewport={{ once: true }}
+              className={`rounded-2xl p-6 border shadow-xs flex flex-col justify-between ${
+                isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-[#ECE5DB]"
+              }`}
+            >
+              <div>
+                <div className="flex gap-1 mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  ))}
+                </div>
+                <p
+                  className={`text-xs sm:text-sm leading-relaxed ${
+                    isDark ? "text-zinc-300" : "text-[#5B6D63]"
+                  }`}
+                >
+                  "Zero wait time experienced for the first time in an OPD hospital. The digital buzzer alerted me on WhatsApp 10 minutes prior."
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-200">
+                  <img
+                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=120"
+                    alt="Jani"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className={`text-xs font-semibold ${isDark ? "text-white" : "text-[#1E293B]"}`}>
+                  Jani K.
+                </span>
+              </div>
+            </motion.div>
+
+            {/* Card 3: Patient Review 2 */}
+            <motion.div
+              variants={fadeUp}
+              initial="hidden"
+              whileInView="visible"
+              custom={2}
+              viewport={{ once: true }}
+              className={`rounded-2xl p-6 border shadow-xs flex flex-col justify-between ${
+                isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-[#ECE5DB]"
+              }`}
+            >
+              <div>
+                <div className="flex gap-1 mb-3">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  ))}
+                </div>
+                <p
+                  className={`text-xs sm:text-sm leading-relaxed ${
+                    isDark ? "text-zinc-300" : "text-[#5B6D63]"
+                  }`}
+                >
+                  "The contactless kiosk check-in with the flip QR pass eliminated the standard paperwork bottleneck entirely."
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2.5 mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                <div className="w-7 h-7 rounded-full overflow-hidden bg-zinc-200">
+                  <img
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=120"
+                    alt="Rani"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className={`text-xs font-semibold ${isDark ? "text-white" : "text-[#1E293B]"}`}>
+                  Rani M.
+                </span>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Digital Queue Token & Flip Card for QR Section ────────────────── */}
+      <section
+        className={`py-16 px-4 sm:px-6 lg:px-8 border-y ${
+          isDark
+            ? "bg-zinc-950/70 border-zinc-800"
+            : "bg-[#F4F0E8]/60 border-[#ECE5DB]"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-10 items-center">
+            {/* Left: Explanation & Instructions */}
+            <div className="lg:col-span-7">
+              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest block mb-2">
+                Digital Check-In
+              </span>
+              <MarkerText className={isDark ? "text-white" : "text-[#13221C]"}>
+                <h2
+                  className={`text-3xl sm:text-4xl font-serif mb-4 leading-tight ${
+                    isDark ? "text-white" : "text-[#13221C]"
+                  }`}
+                >
+                  Skip Reception:{" "}
+                  <Mark color={isDark ? "#1E3B2F" : "#D1E3D7"} type="circle">
+                    Flip for QR Check-In
+                  </Mark>
+                </h2>
+              </MarkerText>
+              <p
+                className={`text-sm sm:text-base leading-relaxed mb-6 max-w-lg ${
+                  isDark ? "text-zinc-400" : "text-[#5B6D63]"
+                }`}
+              >
+                Whenever you book an appointment or join the queue, you receive this digital pass.
+                Drag or click to flip the card and reveal your check-in QR code. Scan it directly
+                at the waiting room kiosk for automated queue call alerts.
               </p>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-xs font-medium" style={{ color: "#64748B" }}>All systems operational</span>
+
+              <div className="space-y-3 mb-8">
+                {[
+                  { title: "No Paper Tokens", desc: "Eco-friendly, digital token stored right on your phone" },
+                  { title: "Kiosk QR Check-in", desc: "Instant self-check-in at tablet kiosks without standing in line" },
+                  { title: "Real-time SMS & Buzzer", desc: "Live countdown so you can grab a coffee until your turn" },
+                ].map((item) => (
+                  <div key={item.title} className="flex items-start gap-3">
+                    <div className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950 flex items-center justify-center shrink-0 mt-0.5">
+                      <Check className="w-3 h-3 text-emerald-700 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <p className={`text-xs sm:text-sm font-semibold ${isDark ? "text-white" : "text-zinc-900"}`}>
+                        {item.title}
+                      </p>
+                      <p className="text-xs text-zinc-500">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => setIsPassFlipped(!isPassFlipped)}
+                  className={`px-5 py-2.5 rounded-xl border text-xs sm:text-sm font-semibold shadow-xs flex items-center gap-2 cursor-pointer transition-all ${
+                    isDark
+                      ? "bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-700"
+                      : "bg-white border-zinc-200 text-zinc-800 hover:bg-zinc-50"
+                  }`}
+                >
+                  <RotateCw className="w-3.5 h-3.5 text-blue-600" />
+                  Flip Card ({isPassFlipped ? "Showing Back QR" : "Showing Front"})
+                </button>
+                <Link
+                  href="/join-queue"
+                  className="px-5 py-2.5 rounded-xl bg-[#1F2D3D] dark:bg-blue-600 text-white text-xs sm:text-sm font-semibold shadow-xs hover:opacity-95"
+                >
+                  Join Live Queue
+                </Link>
               </div>
             </div>
 
-            {/* Links */}
-            <div>
-              <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Platform</h4>
-              <ul className="space-y-3">
-                {["Join Queue", "Book Appointment", "Doctor Dashboard", "Admin Panel"].map((l) => (
-                  <li key={l}>
-                    <a href="#" className="text-sm hover:text-white transition-colors duration-200" style={{ color: "#94A3B8" }}>
-                      {l}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+            {/* Right: KokonutUI CardFlip with QR Code */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center">
+              <div className="relative">
+                <CardFlip
+                  flipped={isPassFlipped}
+                  onFlippedChange={setIsPassFlipped}
+                  front={<MedicalPassFront />}
+                  back={<MedicalPassBack />}
+                  label="Digital Queue Pass with QR Check-In"
+                  className="w-[280px] sm:w-[320px] aspect-[7/10]"
+                  faceClassName="rounded-2xl border border-zinc-200/90 dark:border-zinc-800 shadow-xl overflow-hidden"
+                />
+              </div>
+              <p className="text-[11px] text-zinc-400 mt-4 text-center">
+                Interactive: Click or drag to flip the card and view the QR code
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Slot Picker Booking Section ───────────────────────────────────── */}
+      <section className="py-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-6">
+              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest block mb-2">
+                Live Scheduling
+              </span>
+              <h2
+                className={`text-3xl font-serif mb-4 ${
+                  isDark ? "text-white" : "text-[#13221C]"
+                }`}
+              >
+                Interactive Slot Picker
+              </h2>
+              <p
+                className={`text-sm leading-relaxed mb-6 ${
+                  isDark ? "text-zinc-400" : "text-[#5B6D63]"
+                }`}
+              >
+                Drag through available consultation hours to pick the exact appointment time that works best for your schedule.
+              </p>
+              <div
+                className={`p-4 rounded-xl border space-y-2 text-xs ${
+                  isDark
+                    ? "bg-zinc-900 border-zinc-800 text-zinc-400"
+                    : "bg-white border-[#ECE5DB] text-zinc-600"
+                }`}
+              >
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-sky-500" />
+                  Blue slots represent available consultation hours
+                </p>
+                <p className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-zinc-400" />
+                  Hatched regions indicate existing bookings
+                </p>
+              </div>
             </div>
 
+            {/* KokonutUI SlotPicker */}
+            <div className="lg:col-span-6">
+              <div
+                className={`rounded-2xl border shadow-md overflow-hidden ${
+                  isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-zinc-200"
+                }`}
+              >
+                <SlotPicker
+                  host={{ name: "Dr. Sarah Jenkins", title: "Chief Cardiologist", city: "Phantom, USA" }}
+                  onBook={(slot) => {
+                    window.location.href = `/book-appointment?date=${slot.date}&start=${slot.start}&duration=${slot.minutes}`;
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Doctors Spotlight with CradleText ─────────────────────────────── */}
+      <section
+        id="doctors"
+        className={`py-16 px-4 sm:px-6 lg:px-8 border-t ${
+          isDark ? "bg-[#090D16] border-zinc-800" : "bg-white border-[#ECE5DB]"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            {/* KokonutUI CradleText – Interactive Newton's Cradle headline */}
+            <CradleText text="Meet Our Doctors" className="justify-center" />
+            <p className={`mt-3 text-sm ${isDark ? "text-zinc-400" : "text-[#66776F]"}`}>
+              Board-certified practitioners with decades of combined clinical experience
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {DOCTORS.map((doc, i) => (
+              <motion.div
+                key={doc.name}
+                variants={fadeUp}
+                initial="hidden"
+                whileInView="visible"
+                custom={i}
+                viewport={{ once: true }}
+                className={`rounded-2xl p-6 border flex flex-col justify-between ${
+                  isDark
+                    ? "bg-zinc-900/90 border-zinc-800"
+                    : "bg-[#FAF8F5] border-[#ECE5DB]"
+                }`}
+              >
+                <div>
+                  <div className="w-16 h-16 rounded-xl overflow-hidden mb-4 bg-zinc-200">
+                    <img src={doc.image} alt={doc.name} className="w-full h-full object-cover" />
+                  </div>
+                  <h3
+                    className={`font-serif text-lg font-bold ${
+                      isDark ? "text-white" : "text-[#13221C]"
+                    }`}
+                  >
+                    {doc.name}
+                  </h3>
+                  <p className="text-xs text-blue-600 font-medium mb-3">{doc.specialty}</p>
+                  <p className="text-xs text-zinc-500 mb-4">{doc.slots}</p>
+                </div>
+
+                <div
+                  className={`pt-4 border-t flex items-center justify-between ${
+                    isDark ? "border-zinc-800" : "border-zinc-200/60"
+                  }`}
+                >
+                  <span className={`text-xs font-semibold ${isDark ? "text-zinc-300" : "text-zinc-700"}`}>
+                    {doc.rating} ★ ({doc.exp})
+                  </span>
+                  <Link
+                    href="/book-appointment"
+                    className={`text-xs font-semibold transition-colors ${
+                      isDark ? "text-blue-400 hover:text-blue-300" : "text-[#1F2D3D] hover:text-[#2D5A46]"
+                    }`}
+                  >
+                    Book Slot →
+                  </Link>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── AI Assistant & Medical Report Analysis ────────────────────────── */}
+      <section
+        id="about"
+        className={`py-16 px-4 sm:px-6 lg:px-8 ${
+          isDark ? "bg-[#0B0F19]" : "bg-[#FAF8F5]"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <span className="text-xs font-bold text-blue-600 uppercase tracking-widest block mb-2">
+              AI Healthcare Intelligence
+            </span>
+            <h2
+              className={`text-3xl font-serif ${
+                isDark ? "text-white" : "text-[#13221C]"
+              }`}
+            >
+              Smart Queue &amp; Medical Report Assistant
+            </h2>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8 items-start">
+            {/* KokonutUI AIMessageQueue */}
+            <div
+              className={`rounded-2xl p-6 border shadow-xs ${
+                isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-[#ECE5DB]"
+              }`}
+            >
+              <h3
+                className={`font-serif text-lg font-bold mb-2 flex items-center gap-2 ${
+                  isDark ? "text-white" : "text-zinc-900"
+                }`}
+              >
+                <Brain className="w-4 h-4 text-blue-600" />
+                AI Waiting Room Questions
+              </h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                Queue questions for the doctor while in the digital waiting room:
+              </p>
+              <AIMessageQueue
+                title="Pre-Consultation Queries"
+                initialPrompt="Explain what my elevated blood pressure readings indicate"
+                initialQueue={[
+                  "Are there dietary adjustments I should start today?",
+                  "Should I track my resting pulse rate each morning?",
+                ]}
+              />
+            </div>
+
+            {/* KokonutUI AIAttachment */}
+            <div
+              className={`rounded-2xl p-6 border shadow-xs ${
+                isDark ? "bg-zinc-900 border-zinc-800" : "bg-white border-[#ECE5DB]"
+              }`}
+            >
+              <h3
+                className={`font-serif text-lg font-bold mb-2 flex items-center gap-2 ${
+                  isDark ? "text-white" : "text-zinc-900"
+                }`}
+              >
+                <FileText className="w-4 h-4 text-purple-600" />
+                Instant Report Summarization
+              </h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                Upload your lab tests and get AI page-by-page highlighted summaries:
+              </p>
+              <AIAttachment
+                file={{ name: "Comprehensive-Metabolic-Panel.pdf", size: 3_100_000, pages: 6 }}
+                prompt="Summarize my lipid panel and flag abnormal cholesterol values."
+                answer={[
+                  "Total cholesterol is 185 mg/dL, well within normal target",
+                  { page: 2 },
+                  ". HDL cholesterol is optimal at 58 mg/dL",
+                  { page: 3 },
+                  ". Fasting glucose is 92 mg/dL",
+                  { page: 4 },
+                  ".",
+                ]}
+                uploadMs={1200}
+                pageMs={280}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Secure Document Upload Section ────────────────────────────────── */}
+      <section
+        className={`py-16 px-4 sm:px-6 lg:px-8 border-t ${
+          isDark ? "bg-[#090D16] border-zinc-800" : "bg-white border-[#ECE5DB]"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="grid lg:grid-cols-12 gap-8 items-center">
+            <div className="lg:col-span-6">
+              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest block mb-2">
+                HIPAA Compliant Records
+              </span>
+              <MarkerText className={isDark ? "text-white" : "text-[#13221C]"}>
+                <h2
+                  className={`text-3xl font-serif mb-4 ${
+                    isDark ? "text-white" : "text-[#13221C]"
+                  }`}
+                >
+                  Upload Prescriptions &amp;{" "}
+                  <Mark color={isDark ? "#1E3B2F" : undefined} type="underline">
+                    Lab Documents
+                  </Mark>
+                </h2>
+              </MarkerText>
+              <p
+                className={`text-sm leading-relaxed mb-6 ${
+                  isDark ? "text-zinc-400" : "text-[#5B6D63]"
+                }`}
+              >
+                Drag and drop your previous discharge summaries, radiological reports, and insurance cards securely.
+              </p>
+              <div className="flex items-center gap-4 text-xs text-zinc-500">
+                <span className="flex items-center gap-1.5 font-medium text-emerald-700 dark:text-emerald-400">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  256-bit Encrypted
+                </span>
+                <span className="flex items-center gap-1.5 font-medium text-blue-700 dark:text-blue-400">
+                  <Zap className="w-4 h-4 text-blue-600" />
+                  Instant Delivery
+                </span>
+              </div>
+            </div>
+
+            {/* KokonutUI FileUpload */}
+            <div className="lg:col-span-6">
+              <FileUpload
+                acceptedFileTypes={[".pdf", ".jpg", ".png", "image/*"]}
+                maxFileSize={10 * 1024 * 1024}
+                maxFiles={4}
+                simulateFailure={false}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Call To Action Banner (Matching Inspiration Exactly) ─────────── */}
+      <section
+        className={`py-14 px-4 sm:px-6 lg:px-8 ${
+          isDark ? "bg-emerald-950/80 border-y border-emerald-900" : "bg-[#D8E6DD]/90"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div>
+            <h2
+              className={`text-3xl sm:text-4xl font-serif leading-tight mb-2 ${
+                isDark ? "text-white" : "text-[#13221C]"
+              }`}
+            >
+              Ready to Talk<br className="hidden sm:inline" /> to a Doctor?
+            </h2>
+            <p
+              className={`text-xs sm:text-sm max-w-md ${
+                isDark ? "text-emerald-200/80" : "text-[#3E5549]"
+              }`}
+            >
+              Ready to talk to a Doctor? Consectetur medical service, with one-more appointment.
+            </p>
+          </div>
+
+          <div>
+            <Link
+              href="/book-appointment"
+              className="inline-block px-7 py-3 rounded-full text-sm font-semibold text-white shadow-sm transition-all hover:scale-105"
+              style={{ background: isDark ? "#2563EB" : "#4B7062" }}
+            >
+              Appointment CTA
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Footer (Matching Inspiration Exactly) ─────────────────────────── */}
+      <footer
+        id="contact"
+        className={`py-14 px-4 sm:px-6 lg:px-8 border-t text-xs ${
+          isDark
+            ? "bg-[#090D16] border-zinc-800 text-zinc-400"
+            : "bg-[#FAF8F5] border-[#EAE3D9] text-[#6F7F77]"
+        }`}
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+            {/* Contact */}
             <div>
-              <h4 className="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Company</h4>
-              <ul className="space-y-3">
-                {["About Us", "Privacy Policy", "Terms of Service", "Contact"].map((l) => (
-                  <li key={l}>
-                    <a href="#" className="text-sm hover:text-white transition-colors duration-200" style={{ color: "#94A3B8" }}>
-                      {l}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+              <h4
+                className={`font-bold mb-2 uppercase tracking-wider text-[11px] ${
+                  isDark ? "text-white" : "text-[#1E293B]"
+                }`}
+              >
+                Contact
+              </h4>
+              <p className="leading-relaxed">+1 (555) 277-4580</p>
+              <p className="leading-relaxed">support@mediqueue.org</p>
+            </div>
+
+            {/* Clinic Hours */}
+            <div>
+              <h4
+                className={`font-bold mb-2 uppercase tracking-wider text-[11px] ${
+                  isDark ? "text-white" : "text-[#1E293B]"
+                }`}
+              >
+                Clinic Hours
+              </h4>
+              <p className="leading-relaxed">8:30 AM – 8:00 PM</p>
+              <p className="leading-relaxed">Sat: 9:00 AM – 2:00 PM</p>
+            </div>
+
+            {/* Address */}
+            <div>
+              <h4
+                className={`font-bold mb-2 uppercase tracking-wider text-[11px] ${
+                  isDark ? "text-white" : "text-[#1E293B]"
+                }`}
+              >
+                Location
+              </h4>
+              <p className="leading-relaxed">3832 Westminister Drve,</p>
+              <p className="leading-relaxed">Phantom, USA</p>
+            </div>
+
+            {/* Navigation & Social */}
+            <div>
+              <h4
+                className={`font-bold mb-2 uppercase tracking-wider text-[11px] ${
+                  isDark ? "text-white" : "text-[#1E293B]"
+                }`}
+              >
+                Navigation
+              </h4>
+              <div className="grid grid-cols-2 gap-1.5">
+                <a href="#doctors" className={isDark ? "hover:text-white" : "hover:text-zinc-950"}>
+                  Doctors
+                </a>
+                <a href="#services" className={isDark ? "hover:text-white" : "hover:text-zinc-950"}>
+                  Services
+                </a>
+                <a href="#about" className={isDark ? "hover:text-white" : "hover:text-zinc-950"}>
+                  About
+                </a>
+                <a href="#reviews" className={isDark ? "hover:text-white" : "hover:text-zinc-950"}>
+                  Reviews
+                </a>
+              </div>
             </div>
           </div>
 
-          <div className="pt-8 border-t flex flex-col md:flex-row items-center justify-between gap-4" style={{ borderColor: "#1E293B" }}>
-            <p className="text-sm" style={{ color: "#64748B" }}>
-              © 2026 MediQueue Pro. All rights reserved. Built with ❤️ for better healthcare.
-            </p>
-            <div className="flex items-center gap-1 text-sm" style={{ color: "#64748B" }}>
-              <Shield className="h-4 w-4" style={{ color: "#10B981" }} />
+          <div
+            className={`pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 ${
+              isDark ? "border-zinc-800" : "border-[#EAE3D9]"
+            }`}
+          >
+            <p>© 2026 MediQueue Pro. All rights reserved.</p>
+            <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              <Shield className="w-3.5 h-3.5" />
               HIPAA Compliant &amp; Secure
             </div>
           </div>

@@ -5,11 +5,12 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, ArrowLeft, Clock, User as UserIcon, X, Hospital, Activity, Mail, Phone } from "lucide-react";
+import { Calendar, ArrowLeft, Clock, User as UserIcon, X, Hospital, Activity, Mail, Phone, CheckCircle2, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase/client";
 import { notificationService } from "@/lib/services/notificationService";
+import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
 export default function BookAppointmentPage() {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -31,6 +32,9 @@ export default function BookAppointmentPage() {
   });
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [otpNotice, setOtpNotice] = useState<string | null>(null);
   const [otpSent, setOtpSent] = useState(false);
   const [otpVerified, setOtpVerified] = useState(false);
   const [pendingAppointmentData, setPendingAppointmentData] = useState<any>(null);
@@ -386,6 +390,7 @@ export default function BookAppointmentPage() {
 
   const sendOTP = async () => {
     setLoading(true);
+    setOtpError(null);
     try {
       const response = await fetch('/api/send-otp', {
         method: 'POST',
@@ -400,13 +405,16 @@ export default function BookAppointmentPage() {
 
       if (response.ok) {
         setOtpSent(true);
-        alert('OTP sent to your email. Please check your inbox.');
+        if (data.devOtp) {
+          setDevOtp(data.devOtp);
+        }
+        setOtpNotice('OTP sent to your email. Please check your inbox or Spam folder.');
       } else {
-        alert(data.error || 'Failed to send OTP');
+        setOtpError(data.error || 'Failed to send OTP');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending OTP:', error);
-      alert('Failed to send OTP. Please try again.');
+      setOtpError('Failed to send OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -414,11 +422,12 @@ export default function BookAppointmentPage() {
 
   const verifyOTP = async () => {
     if (!otp || otp.length !== 6) {
-      alert('Please enter a valid 6-digit OTP');
+      setOtpError('Please enter a valid 6-digit OTP');
       return;
     }
 
     setLoading(true);
+    setOtpError(null);
     try {
       const response = await fetch('/api/verify-otp', {
         method: 'POST',
@@ -434,15 +443,15 @@ export default function BookAppointmentPage() {
 
       if (response.ok) {
         setOtpVerified(true);
-        alert('OTP verified successfully! Booking your appointment...');
+        setShowOTPModal(false);
         // Now actually book the appointment
         await completeAppointmentBooking();
       } else {
-        alert(data.error || 'Invalid OTP. Please try again.');
+        setOtpError(data.error || 'Invalid OTP. Please check and try again.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error verifying OTP:', error);
-      alert('Failed to verify OTP. Please try again.');
+      setOtpError('Failed to verify OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -508,35 +517,90 @@ export default function BookAppointmentPage() {
         supabase.from('doctors').select('name').eq('id', selectedDoctor).single()
       ]);
 
+      const doctorName = doctorData.data?.name || 'Doctor';
+      const hospitalName = hospitalData.data?.name || 'Hospital';
+      const departmentName = departmentData.data?.name || 'Department';
+      const formattedDateIso = appointmentDate.includes('T') ? appointmentDate : `${appointmentDate}T00:00:00.000Z`;
+
       const { data, error } = await supabase
         .from('appointments')
         .insert({
           patient_id: user.id,
           patient_name: formData.name,
           hospital_id: selectedHospital,
+          hospital_name: hospitalName,
           department_id: selectedDepartment,
+          department_name: departmentName,
           doctor_id: selectedDoctor,
-          date: new Date(appointmentDate).toISOString(),
+          doctor_name: doctorName,
+          date: formattedDateIso,
           time_slot: timeSlot,
-          status: 'pending',
-          otp_verified: false
+          status: 'confirmed',
+          otp_verified: true
         })
         .select()
         .single();
       
       if (error) throw error;
 
+      // If appointment is for TODAY, also register them in the live queue for the doctor
+      const todayString = new Date().toISOString().split('T')[0];
+      if (appointmentDate === todayString) {
+        try {
+          const tokenNum = Math.floor(100000 + Math.random() * 900000);
+          await supabase.from('queue').insert({
+            token_number: tokenNum,
+            patient_id: user.id,
+            patient_name: formData.name,
+            hospital_id: selectedHospital,
+            department_id: selectedDepartment,
+            doctor_id: selectedDoctor,
+            date: new Date().toISOString(),
+            time: new Date().toISOString(),
+            treatment_type: 'Scheduled Consultation',
+            is_emergency: false,
+            status: 'waiting',
+            position: 1,
+            estimated_wait_time: 15
+          });
+        } catch (qErr) {
+          console.warn('Auto live queue insert warning:', qErr);
+        }
+      }
+
+      // Send confirmation email via email service
+      try {
+        await fetch('/api/appointments/send-confirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            appointmentDetails: {
+              appointmentId: data.id,
+              patientName: formData.name,
+              doctorName,
+              hospitalName,
+              departmentName,
+              date: appointmentDate,
+              timeSlot
+            }
+          })
+        });
+      } catch (mailErr) {
+        console.warn('Confirmation email dispatch warning:', mailErr);
+      }
+
       // Send notification to admin about new appointment
       await notificationService.createNotification(
         'appointment',
         '📅 New Appointment Booked',
-        `${formData.name} has booked an appointment with Dr. ${doctorData.data?.name || 'Unknown'} at ${hospitalData.data?.name || 'Hospital'} on ${appointmentDate} at ${timeSlot}`,
+        `${formData.name} has booked an appointment with Dr. ${doctorName} at ${hospitalName} on ${appointmentDate} at ${timeSlot}`,
         {
           appointmentId: data.id,
           patientName: formData.name,
-          doctorName: doctorData.data?.name,
-          hospitalName: hospitalData.data?.name,
-          departmentName: departmentData.data?.name,
+          doctorName,
+          hospitalName,
+          departmentName,
           date: appointmentDate,
           time: timeSlot
         }
@@ -547,13 +611,13 @@ export default function BookAppointmentPage() {
         await notificationService.createNotification(
           'appointment',
           `📅 New Appointment - ${appointmentDate}`,
-          `You have a new appointment with ${formData.name} on ${appointmentDate} at ${timeSlot} at ${hospitalData.data?.name || 'Hospital'}`,
+          `You have a new appointment with ${formData.name} on ${appointmentDate} at ${timeSlot} at ${hospitalName}`,
           {
             appointmentId: data.id,
             patientName: formData.name,
-            doctorName: doctorData.data.name,
-            hospitalName: hospitalData.data?.name,
-            departmentName: departmentData.data?.name,
+            doctorName,
+            hospitalName,
+            departmentName,
             date: appointmentDate,
             time: timeSlot,
             targetDoctorId: selectedDoctor
@@ -565,9 +629,9 @@ export default function BookAppointmentPage() {
       setConfirmationData({
         appointmentId: data.id,
         patientName: formData.name,
-        doctorName: doctorData.data?.name || 'Unknown',
-        hospitalName: hospitalData.data?.name || 'Hospital',
-        departmentName: departmentData.data?.name || 'Department',
+        doctorName,
+        hospitalName,
+        departmentName,
         date: appointmentDate,
         time: timeSlot,
         status: 'confirmed'
@@ -604,7 +668,7 @@ export default function BookAppointmentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#EFF6FF] relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#EFF6FF] dark:from-[#090D16] dark:via-[#0F172A] dark:to-[#0B1120] text-zinc-900 dark:text-zinc-100 relative overflow-hidden transition-colors duration-300">
       {/* Animated Background Blobs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
         <motion.div 
@@ -619,19 +683,21 @@ export default function BookAppointmentPage() {
         />
       </div>
 
-      <header className="bg-white/70 backdrop-blur-xl border-b border-[#E5E7EB] sticky top-0 z-50">
+      <header className="bg-white/70 dark:bg-[#090D16]/80 backdrop-blur-xl border-b border-[#E5E7EB] dark:border-zinc-800 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <Link href="/" className="flex items-center space-x-2 group">
-              <div className="p-2 bg-gray-50 rounded-full group-hover:bg-blue-50 transition-colors">
-                <ArrowLeft className="h-5 w-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
+              <div className="p-2 bg-gray-50 dark:bg-zinc-800 rounded-full group-hover:bg-blue-50 transition-colors">
+                <ArrowLeft className="h-5 w-5 text-slate-500 dark:text-zinc-400 group-hover:text-blue-600 transition-colors" />
               </div>
-              <span className="text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Back</span>
+              <span className="text-slate-600 dark:text-zinc-400 dark:text-zinc-300 font-medium group-hover:text-slate-900 dark:text-white dark:group-hover:text-white transition-colors">Back</span>
             </Link>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
               Book Appointment
             </h1>
-            <div className="w-24"></div>
+            <div className="w-24 flex justify-end">
+              <SunMoonThemeToggle size={38} />
+            </div>
           </div>
         </div>
       </header>
@@ -642,15 +708,15 @@ export default function BookAppointmentPage() {
            animate={{ opacity: 1, y: 0 }}
            transition={{ duration: 0.5 }}
         >
-        <Card className="border-0 shadow-xl shadow-blue-900/5 ring-1 ring-gray-100 rounded-2xl overflow-hidden bg-white/90 backdrop-blur-sm">
-          <CardHeader className="bg-gradient-to-b from-gray-50/50 to-white px-8 py-6 border-b border-gray-100">
-            <CardTitle className="flex items-center gap-3 text-2xl font-bold text-slate-900">
+        <Card className="border-0 shadow-xl shadow-blue-900/5 ring-1 ring-gray-100 dark:ring-zinc-800 rounded-2xl overflow-hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-transparent dark:border-zinc-800">
+          <CardHeader className="bg-gradient-to-b from-gray-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 sm:px-8 py-6 border-b border-gray-100 dark:border-zinc-800">
+            <CardTitle className="flex items-center gap-3 text-2xl font-bold text-slate-900 dark:text-white">
               <div className="p-2.5 bg-blue-100/50 rounded-xl text-blue-600">
                 <Calendar className="h-6 w-6" />
               </div>
               Schedule Your Appointment
             </CardTitle>
-            <CardDescription className="text-slate-500 text-base mt-2">
+            <CardDescription className="text-slate-500 dark:text-zinc-400 text-base mt-2">
               Book an appointment with your preferred doctor based on availability and ratings
             </CardDescription>
           </CardHeader>
@@ -661,7 +727,7 @@ export default function BookAppointmentPage() {
                 <h3 className="text-lg font-semibold mb-4 text-gray-800">Your Upcoming Appointments</h3>
                 <div className="space-y-3">
                   {userAppointments.map((appointment) => (
-                    <div key={appointment.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <div key={appointment.id} className="bg-gray-50 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700 rounded-lg p-4">
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="font-medium text-gray-900">
@@ -705,7 +771,7 @@ export default function BookAppointmentPage() {
             <form onSubmit={handleSubmit} className="p-2 space-y-8 mt-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Select Hospital
                   </label>
                   <div className="relative">
@@ -720,7 +786,7 @@ export default function BookAppointmentPage() {
                         setSelectedDoctor('');
                       }}
                       required
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 appearance-none"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 appearance-none"
                     >
                       <option value="">Choose a hospital...</option>
                       {hospitals.length === 0 ? (
@@ -737,7 +803,7 @@ export default function BookAppointmentPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Select Department
                   </label>
                   <div className="relative">
@@ -752,7 +818,7 @@ export default function BookAppointmentPage() {
                       }}
                       required
                       disabled={!selectedHospital}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
                     >
                       <option value="">Choose a department...</option>
                       {departments.map((department) => (
@@ -766,7 +832,7 @@ export default function BookAppointmentPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                   Select Doctor
                 </label>
                 <div className="relative">
@@ -778,7 +844,7 @@ export default function BookAppointmentPage() {
                     onChange={(e) => setSelectedDoctor(e.target.value)}
                     required
                     disabled={!selectedDepartment}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
                   >
                     <option value="">Choose a doctor...</option>
                     {doctors.length > 0 ? (
@@ -803,7 +869,7 @@ export default function BookAppointmentPage() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Appointment Date
                   </label>
                   <div className="relative group">
@@ -816,13 +882,13 @@ export default function BookAppointmentPage() {
                       onChange={(e) => setAppointmentDate(e.target.value)}
                       required
                       min={new Date().toISOString().split('T')[0]}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Time Slot
                   </label>
                   <div className="relative">
@@ -833,7 +899,7 @@ export default function BookAppointmentPage() {
                       value={timeSlot}
                       onChange={(e) => setTimeSlot(e.target.value)}
                       required
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 appearance-none"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 appearance-none"
                     >
                       <option value="">Select time...</option>
                       {[
@@ -855,7 +921,7 @@ export default function BookAppointmentPage() {
                     </select>
                   </div>
                   {bookedSlots.length > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 dark:text-zinc-400 mt-1">
                       Some time slots are already booked
                     </p>
                   )}
@@ -864,7 +930,7 @@ export default function BookAppointmentPage() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Full Name
                   </label>
                   <div className="relative group">
@@ -877,13 +943,13 @@ export default function BookAppointmentPage() {
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                       placeholder="Enter your full name"
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Email Address
                   </label>
                   <div className="relative group">
@@ -896,14 +962,14 @@ export default function BookAppointmentPage() {
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       required
                       placeholder="you@example.com"
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                     />
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                   Mobile Number
                 </label>
                 <div className="relative group">
@@ -916,7 +982,7 @@ export default function BookAppointmentPage() {
                     onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                     required
                     placeholder="+91 1234567890"
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                   />
                 </div>
               </div>
@@ -935,7 +1001,7 @@ export default function BookAppointmentPage() {
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link href="/" className="flex-1">
-                  <Button type="button" variant="outline" className="w-full py-6 text-base font-medium rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all">
+                  <Button type="button" variant="outline" className="w-full py-6 text-base font-medium rounded-xl border-slate-200 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 hover:text-slate-900 dark:text-white transition-all">
                     Cancel
                   </Button>
                 </Link>
@@ -955,26 +1021,111 @@ export default function BookAppointmentPage() {
 
         {/* OTP Verification Modal */}
         {showOTPModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-              <h2 className="text-2xl font-bold mb-4">Verify Your Email</h2>
-              <p className="text-gray-600 mb-6">
-                We've sent a 6-digit OTP to <strong>{formData.email}</strong>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl transition-all">
+              <h2 className="text-2xl font-bold mb-1 text-slate-900 dark:text-white">Verify Your Appointment</h2>
+              <p className="text-xs text-slate-600 dark:text-zinc-400 mb-4">
+                Booking consultation for <strong className="text-slate-900 dark:text-white">{formData.name}</strong> ({formData.email})
               </p>
 
+              {/* Clerk Instant Verification Box */}
+              {user && (
+                <div className="mb-5 p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-blue-500/10 border border-emerald-500/30 dark:border-emerald-500/20">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      <CheckCircle2 className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-zinc-900 dark:text-white">
+                          Verified via Clerk Auth
+                        </span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                          Pre-Verified
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-zinc-600 dark:text-zinc-400 mt-0.5">
+                        Your Clerk session for <strong className="text-zinc-900 dark:text-white">{user.primaryEmailAddress?.emailAddress}</strong> is active and verified.
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setOtpVerified(true);
+                          setShowOTPModal(false);
+                          await completeAppointmentBooking();
+                        }}
+                        disabled={loading}
+                        className="mt-3 w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        <span>{loading ? "Confirming..." : "Instant Confirm with Clerk (No Code Needed)"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="relative my-4 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-zinc-200 dark:border-zinc-700" />
+                </div>
+                <span className="relative bg-white dark:bg-zinc-900 px-3 text-[10px] uppercase tracking-wider text-zinc-400 font-bold">
+                  Or Confirm With 6-Digit Code
+                </span>
+              </div>
+
+              {/* Spam folder tip */}
+              <div className="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-xs text-amber-800 dark:text-amber-300">
+                ⚠️ <strong>Note:</strong> We sent the OTP to <strong>{formData.email}</strong>. If not in primary inbox, check your <strong>Spam / Junk</strong> folder.
+              </div>
+
+              {/* Dev / Quick Access Auto-Fill Banner */}
+              {devOtp && (
+                <div className="mb-4 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/50 border border-blue-200 dark:border-blue-800 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 block">
+                      Quick Access Code
+                    </span>
+                    <span className="font-mono text-base font-bold text-blue-700 dark:text-blue-300 tracking-wider">
+                      {devOtp}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setOtp(devOtp); setOtpError(null); }}
+                    className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    Auto-Fill OTP
+                  </button>
+                </div>
+              )}
+
+              {otpError && (
+                <div className="mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-xs text-red-600 dark:text-red-400 font-medium">
+                  {otpError}
+                </div>
+              )}
+
+              {otpNotice && !otpError && (
+                <div className="mb-4 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+                  {otpNotice}
+                </div>
+              )}
+
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Enter OTP
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300 mb-2">
+                  Enter 6-Digit OTP
                 </label>
                 <input
                   type="text"
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '').slice(0, 6)); setOtpError(null); }}
                   placeholder="000000"
                   maxLength={6}
-                  className="w-full px-4 py-3 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest"
+                  className="w-full px-4 py-3 text-center text-3xl font-mono font-bold border-2 border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest"
                 />
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-xs text-slate-500 dark:text-zinc-400 mt-2 text-center">
                   OTP is valid for 10 minutes
                 </p>
               </div>
@@ -987,45 +1138,34 @@ export default function BookAppointmentPage() {
                     setShowOTPModal(false);
                     setOtp('');
                     setOtpSent(false);
+                    setOtpError(null);
+                    setOtpNotice(null);
                   }}
-                  className="flex-1"
+                  className="flex-1 rounded-xl"
                   disabled={loading}
                 >
                   Cancel
                 </Button>
-                {!otpSent ? (
-                  <Button
-                    type="button"
-                    onClick={sendOTP}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700"
-                    disabled={loading}
-                  >
-                    {loading ? 'Sending...' : 'Send OTP'}
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={verifyOTP}
-                    className="flex-1 bg-green-600 hover:bg-green-700"
-                    disabled={loading || otp.length !== 6}
-                  >
-                    {loading ? 'Verifying...' : 'Verify & Book'}
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  onClick={verifyOTP}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold"
+                  disabled={loading || otp.length !== 6}
+                >
+                  {loading ? 'Verifying...' : 'Verify & Book'}
+                </Button>
               </div>
 
-              {otpSent && (
-                <div className="mt-4 text-center">
-                  <button
-                    type="button"
-                    onClick={sendOTP}
-                    className="text-sm text-blue-600 hover:underline"
-                    disabled={loading}
-                  >
-                    Resend OTP
-                  </button>
-                </div>
-              )}
+              <div className="mt-4 text-center">
+                <button
+                  type="button"
+                  onClick={sendOTP}
+                  className="text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                  disabled={loading}
+                >
+                  Didn't receive email? Click to Resend OTP
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1126,7 +1266,7 @@ export default function BookAppointmentPage() {
               </div>
 
               <div className="space-y-4">
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700 rounded-lg p-4">
                   <p className="text-sm text-gray-700">
                     <strong>Current Appointment:</strong><br />
                     {new Date(rescheduleData.date).toLocaleDateString()} at {rescheduleData.time_slot}

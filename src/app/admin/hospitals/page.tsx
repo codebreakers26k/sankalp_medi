@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import {
   Hospital, ArrowLeft, Plus, Upload, X, Eye, CheckCircle,
-  AlertCircle, Loader2, FileText, Pencil, Trash2, ExternalLink
+  AlertCircle, Loader2, FileText, Pencil, Trash2, ExternalLink, LogOut
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
+import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
 const HOSPITAL_TYPES = ["private", "government", "clinic", "multi-specialty", "trust"] as const;
 
@@ -51,6 +52,7 @@ const emptyForm = {
 
 export default function AdminHospitalsPage() {
   const { isLoaded, isSignedIn, user } = useUser();
+  const { signOut } = useClerk();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -184,7 +186,7 @@ export default function AdminHospitalsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#EFF6FF]">
+    <div className="min-h-screen bg-[#FAF8F5] dark:bg-zinc-800/60">
       {/* Toast */}
       <AnimatePresence>
         {toast && (
@@ -201,26 +203,39 @@ export default function AdminHospitalsPage() {
       </AnimatePresence>
 
       {/* Header */}
-      <header className="bg-white/70 backdrop-blur-xl border-b border-[#E5E7EB] sticky top-0 z-40">
+      <header className="bg-[#FAF8F5] dark:bg-zinc-800/60/90 dark:bg-[#090D16]/90 backdrop-blur-md border-b border-[#ECE5DB] dark:border-zinc-800 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <Link href="/admin" className="flex items-center space-x-2 group">
-              <div className="p-2 bg-gray-50 rounded-full group-hover:bg-blue-50 transition-colors">
-                <ArrowLeft className="h-5 w-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
+              <div className="p-2 bg-white dark:bg-zinc-800 rounded-xl border border-[#ECE5DB] dark:border-zinc-700 dark:border-zinc-800 shadow-xs group-hover:bg-[#E8EFEA] transition-colors">
+                <ArrowLeft className="h-4 w-4 text-[#1E293B] dark:text-white" />
               </div>
-              <span className="text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Admin Panel</span>
+              <span className="text-sm font-semibold text-[#1E293B] dark:text-white group-hover:text-[#2D5A46] transition-colors">Admin Overview</span>
             </Link>
-            <div className="flex items-center gap-3">
-              <Hospital className="h-5 w-5 text-blue-600" />
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Hospital Management</h1>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                <Hospital className="h-4 w-4" />
+              </div>
+              <h1 className="text-lg font-serif font-bold text-[#13221C] dark:text-white tracking-tight">Facility Hubs</h1>
             </div>
-            <button
-              onClick={() => { resetForm(); setShowForm(v => !v); }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-sm font-semibold rounded-xl shadow hover:from-blue-700 hover:to-indigo-700 transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              Add Hospital
-            </button>
+            <div className="flex items-center gap-2.5">
+              <SunMoonThemeToggle size={38} />
+              <button
+                onClick={() => { resetForm(); setShowForm(v => !v); }}
+                className="flex items-center gap-2 px-4 py-2 bg-[#1F2D3D] text-white text-xs sm:text-sm font-semibold rounded-xl shadow-xs hover:opacity-95 transition-all cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                Add Hospital
+              </button>
+              <button
+                onClick={() => signOut({ redirectUrl: "/" })}
+                title="Sign out of admin portal"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-zinc-700 dark:text-zinc-300 bg-white dark:bg-zinc-900 border border-[#ECE5DB] dark:border-zinc-800 shadow-xs hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-all cursor-pointer"
+              >
+                <LogOut className="w-3.5 h-3.5 text-zinc-400 group-hover:text-red-600" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -231,100 +246,100 @@ export default function AdminHospitalsPage() {
         <AnimatePresence>
           {showForm && (
             <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
-              className="mb-10 bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 overflow-hidden">
-              <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">{editingId ? "Edit Hospital" : "Add New Hospital"}</h2>
-                <button onClick={resetForm} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X className="h-5 w-5 text-slate-500" />
+              className="mb-10 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800 overflow-hidden">
+              <div className="px-6 py-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900 dark:text-white">{editingId ? "Edit Hospital" : "Add New Hospital"}</h2>
+                <button onClick={resetForm} className="p-2 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition-colors">
+                  <X className="h-5 w-5 text-slate-500 dark:text-zinc-400" />
                 </button>
               </div>
               <form onSubmit={handleSubmit} className="p-6 space-y-6">
                 {/* Basic Info */}
                 <div>
-                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">Basic Information</h3>
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider mb-4">Basic Information</h3>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Hospital Name <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Hospital Name <span className="text-red-500">*</span></label>
                       <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required
-                        placeholder="e.g. Apollo Hospital" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="e.g. Apollo Hospital" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Type <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Type <span className="text-red-500">*</span></label>
                       <select value={form.hospital_type} onChange={e => setForm(f => ({ ...f, hospital_type: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white capitalize">
+                        className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-white capitalize">
                         {HOSPITAL_TYPES.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
                       </select>
                     </div>
                     <div className="lg:col-span-2">
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Address <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Address <span className="text-red-500">*</span></label>
                       <input value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} required
-                        placeholder="Street address" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="Street address" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">City <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">City <span className="text-red-500">*</span></label>
                       <input value={form.city} onChange={e => setForm(f => ({ ...f, city: e.target.value }))} required
-                        placeholder="City" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="City" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">State <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">State <span className="text-red-500">*</span></label>
                       <input value={form.state} onChange={e => setForm(f => ({ ...f, state: e.target.value }))} required
-                        placeholder="State" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="State" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Pincode <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Pincode <span className="text-red-500">*</span></label>
                       <input value={form.pincode} onChange={e => setForm(f => ({ ...f, pincode: e.target.value }))} required
-                        placeholder="6-digit pincode" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="6-digit pincode" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Phone <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Phone <span className="text-red-500">*</span></label>
                       <input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} required
-                        placeholder="+91 XXXXXXXXXX" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="+91 XXXXXXXXXX" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Email <span className="text-red-500">*</span></label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Email <span className="text-red-500">*</span></label>
                       <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required
-                        placeholder="contact@hospital.com" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="contact@hospital.com" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Bed Count</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Bed Count</label>
                       <input type="number" min="0" value={form.bed_count} onChange={e => setForm(f => ({ ...f, bed_count: e.target.value }))}
-                        placeholder="0" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="0" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Accreditation</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Accreditation</label>
                       <input value={form.accreditation} onChange={e => setForm(f => ({ ...f, accreditation: e.target.value }))}
-                        placeholder="e.g. NABH, JCI" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="e.g. NABH, JCI" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">Website</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">Website</label>
                       <input value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
-                        placeholder="https://hospital.com" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="https://hospital.com" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                   </div>
                 </div>
 
                 {/* License Information */}
                 <div className="border-t border-slate-100 pt-6">
-                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider mb-4">License &amp; Compliance</h3>
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-zinc-300 uppercase tracking-wider mb-4">License &amp; Compliance</h3>
                   <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">License Number</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">License Number</label>
                       <input value={form.license_number} onChange={e => setForm(f => ({ ...f, license_number: e.target.value }))}
-                        placeholder="e.g. MH/HOS/2024/1234" className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        placeholder="e.g. MH/HOS/2024/1234" className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">License Expiry Date</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">License Expiry Date</label>
                       <input type="date" value={form.license_expiry} onChange={e => setForm(f => ({ ...f, license_expiry: e.target.value }))}
-                        className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        className="w-full px-3 py-2.5 border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1.5">License Document</label>
+                      <label className="block text-xs font-semibold text-slate-600 dark:text-zinc-400 mb-1.5">License Document</label>
                       <div
                         onClick={() => fileInputRef.current?.click()}
                         className="flex items-center gap-3 px-3 py-2.5 border-2 border-dashed border-slate-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all group"
                       >
                         <Upload className="h-4 w-4 text-slate-400 group-hover:text-blue-500" />
-                        <span className="text-sm text-slate-500 group-hover:text-blue-600 truncate">
+                        <span className="text-sm text-slate-500 dark:text-zinc-400 group-hover:text-blue-600 truncate">
                           {licenseFile ? licenseFile.name : "Upload PDF / Image"}
                         </span>
                       </div>
@@ -340,7 +355,7 @@ export default function AdminHospitalsPage() {
                     {(saving || uploading) && <Loader2 className="h-4 w-4 animate-spin" />}
                     {editingId ? "Save Changes" : "Add Hospital"}
                   </button>
-                  <button type="button" onClick={resetForm} className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
+                  <button type="button" onClick={resetForm} className="px-5 py-2.5 text-sm font-semibold text-slate-600 dark:text-zinc-400 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">
                     Cancel
                   </button>
                 </div>
@@ -350,11 +365,11 @@ export default function AdminHospitalsPage() {
         </AnimatePresence>
 
         {/* Hospitals Table */}
-        <div className="bg-white rounded-2xl shadow-xl ring-1 ring-slate-100 overflow-hidden">
-          <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-xl ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800 overflow-hidden">
+          <div className="px-6 py-5 border-b border-slate-100 dark:border-zinc-800 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Registered Hospitals</h2>
-              <p className="text-sm text-slate-500 mt-0.5">{hospitals.length} hospital{hospitals.length !== 1 ? "s" : ""} on the platform</p>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Registered Hospitals</h2>
+              <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">{hospitals.length} hospital{hospitals.length !== 1 ? "s" : ""} on the platform</p>
             </div>
           </div>
 
@@ -365,21 +380,21 @@ export default function AdminHospitalsPage() {
           ) : hospitals.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <Hospital className="h-14 w-14 mb-4 text-slate-200" />
-              <p className="font-semibold text-slate-500">No hospitals yet</p>
+              <p className="font-semibold text-slate-500 dark:text-zinc-400">No hospitals yet</p>
               <p className="text-sm mt-1">Click &quot;Add Hospital&quot; to register your first facility.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-100">
-                    <th className="text-left px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Hospital</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Location</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">License</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Beds</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                    <th className="text-right px-6 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">Actions</th>
+                  <tr className="bg-slate-50 dark:bg-zinc-800/50 border-b border-slate-100 dark:border-zinc-800">
+                    <th className="text-left px-6 py-3 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Hospital</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Location</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Type</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">License</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Beds</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Status</th>
+                    <th className="text-right px-6 py-3 text-xs font-bold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -389,20 +404,20 @@ export default function AdminHospitalsPage() {
                       : false;
                     return (
                       <motion.tr key={h.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}
-                        className="hover:bg-slate-50/50 transition-colors">
+                        className="hover:bg-slate-50 dark:hover:bg-zinc-800/50 dark:bg-zinc-800/50/50 transition-colors">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
                               <Hospital className="h-4 w-4 text-blue-600" />
                             </div>
                             <div>
-                              <p className="font-bold text-slate-900">{h.name}</p>
-                              <p className="text-xs text-slate-500">{h.email}</p>
+                              <p className="font-bold text-slate-900 dark:text-white">{h.name}</p>
+                              <p className="text-xs text-slate-500 dark:text-zinc-400">{h.email}</p>
                             </div>
                           </div>
                         </td>
                         <td className="px-4 py-4">
-                          <p className="text-slate-700 font-medium">{h.city}, {h.state}</p>
+                          <p className="text-slate-700 dark:text-zinc-300 font-medium">{h.city}, {h.state}</p>
                           <p className="text-xs text-slate-400">{h.pincode}</p>
                         </td>
                         <td className="px-4 py-4">
@@ -413,7 +428,7 @@ export default function AdminHospitalsPage() {
                         <td className="px-4 py-4">
                           {h.license_number ? (
                             <div>
-                              <p className="font-medium text-slate-700 font-mono text-xs">{h.license_number}</p>
+                              <p className="font-medium text-slate-700 dark:text-zinc-300 font-mono text-xs">{h.license_number}</p>
                               {h.license_expiry && (
                                 <p className={`text-xs mt-0.5 font-medium ${isExpiringSoon ? "text-amber-600" : "text-slate-400"}`}>
                                   {isExpiringSoon && "⚠ "}Exp: {new Date(h.license_expiry).toLocaleDateString("en-IN")}
@@ -438,7 +453,7 @@ export default function AdminHospitalsPage() {
                             className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border transition-colors ${
                               (h.is_active ?? true)
                                 ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
-                                : "bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200"
+                                : "bg-slate-100 text-slate-500 dark:text-zinc-400 border-slate-200 hover:bg-slate-200"
                             }`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${(h.is_active ?? true) ? "bg-emerald-500" : "bg-slate-400"}`} />
                             {(h.is_active ?? true) ? "Active" : "Inactive"}
@@ -448,7 +463,7 @@ export default function AdminHospitalsPage() {
                           <div className="flex items-center justify-end gap-2">
                             {h.website && (
                               <a href={h.website} target="_blank" rel="noreferrer"
-                                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-700">
+                                className="p-1.5 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-lg transition-colors text-slate-400 hover:text-slate-700 dark:text-zinc-300">
                                 <ExternalLink className="h-4 w-4" />
                               </a>
                             )}
@@ -483,10 +498,10 @@ export default function AdminHospitalsPage() {
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Trash2 className="h-6 w-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 text-center mb-2">Delete Hospital?</h3>
-              <p className="text-sm text-slate-500 text-center mb-6">This will also remove all associated departments and doctors. This action cannot be undone.</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white text-center mb-2">Delete Hospital?</h3>
+              <p className="text-sm text-slate-500 dark:text-zinc-400 text-center mb-6">This will also remove all associated departments and doctors. This action cannot be undone.</p>
               <div className="flex gap-3">
-                <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
+                <button onClick={() => setDeleteConfirm(null)} className="flex-1 px-4 py-2.5 text-sm font-semibold text-slate-600 dark:text-zinc-400 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
                 <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-600 rounded-xl hover:bg-red-700 transition-colors">Delete</button>
               </div>
             </motion.div>

@@ -10,6 +10,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { PatientNotification } from "@/components/PatientNotification";
 import { motion, AnimatePresence } from "framer-motion";
+import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
 interface ActivityItem {
   id: string;
@@ -46,8 +47,21 @@ export default function DashboardPage() {
   });
 
   useEffect(() => {
-    if (isLoaded && !isSignedIn) router.push("/sign-in");
-  }, [isLoaded, isSignedIn, router]);
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      router.push("/sign-in");
+      return;
+    }
+    const userRole = user?.publicMetadata?.role as string | undefined;
+    if (userRole === "admin") {
+      router.replace("/admin");
+      return;
+    }
+    if (userRole === "doctor") {
+      router.replace("/doctor");
+      return;
+    }
+  }, [isLoaded, isSignedIn, user, router]);
 
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
@@ -156,7 +170,8 @@ export default function DashboardPage() {
     }
   };
 
-  if (!isLoaded || !isSignedIn) {
+  const userRole = user?.publicMetadata?.role as string | undefined;
+  if (!isLoaded || !isSignedIn || userRole === "admin" || userRole === "doctor") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -165,7 +180,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#EFF6FF] relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-[#F8FAFC] via-white to-[#EFF6FF] dark:from-[#090D16] dark:via-[#0F172A] dark:to-[#0B1120] text-zinc-900 dark:text-zinc-100 relative overflow-hidden transition-colors duration-300">
       {/* Animated Background Blobs */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
         <motion.div animate={{ scale: [1, 1.1, 1], x: [0, 50, 0], y: [0, 30, 0] }} transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
@@ -174,18 +189,19 @@ export default function DashboardPage() {
           className="absolute top-[30%] -right-[10%] w-[40%] h-[60%] bg-[#7C3AED] rounded-full mix-blend-multiply filter blur-[120px] opacity-10" />
       </div>
 
-      <header className="bg-white/70 backdrop-blur-xl border-b border-[#E5E7EB] sticky top-0 z-50">
+      <header className="bg-white/70 dark:bg-[#090D16]/80 backdrop-blur-xl border-b border-[#E5E7EB] dark:border-zinc-800 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <Link href="/" className="flex items-center space-x-2 group">
-              <div className="p-2 bg-gray-50 rounded-full group-hover:bg-blue-50 transition-colors">
-                <ArrowLeft className="h-5 w-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
+              <div className="p-2 bg-gray-50 dark:bg-zinc-800 rounded-full group-hover:bg-blue-50 transition-colors">
+                <ArrowLeft className="h-5 w-5 text-slate-500 dark:text-zinc-400 group-hover:text-blue-600 transition-colors" />
               </div>
-              <span className="text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Back</span>
+              <span className="text-slate-600 dark:text-zinc-400 dark:text-zinc-300 font-medium group-hover:text-slate-900 dark:text-white dark:group-hover:text-white transition-colors">Back</span>
             </Link>
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">Patient Portal</h1>
-            <div className="w-24 flex justify-end">
-              <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white">
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">Patient Portal</h1>
+            <div className="flex items-center gap-3">
+              <SunMoonThemeToggle size={38} />
+              <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-md ring-2 ring-white dark:ring-zinc-700">
                 {user.firstName?.charAt(0) || "P"}
               </div>
             </div>
@@ -195,8 +211,8 @@ export default function DashboardPage() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="mb-10">
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">Welcome back, {user.firstName || user.fullName}!</h2>
-          <p className="text-slate-500 text-lg">Here's your queue and appointment overview</p>
+          <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">Welcome back, {user.firstName || user.fullName}!</h2>
+          <p className="text-slate-500 dark:text-zinc-400 text-lg">Here's your queue and appointment overview</p>
         </div>
 
         {/* Stats */}
@@ -212,8 +228,8 @@ export default function DashboardPage() {
                   <div className={`p-3 rounded-xl mb-4 w-fit ${s.gradient ? "bg-white/20" : `bg-${s.color}-50`}`}>
                     <s.icon className={`h-6 w-6 ${s.gradient ? "text-white" : `text-${s.color}-600`}`} />
                   </div>
-                  <div className={`text-4xl font-bold tracking-tight mb-1 ${s.gradient ? "" : "text-slate-900"}`}>{s.value}</div>
-                  <p className={`text-sm font-medium ${s.gradient ? "text-blue-100" : "text-slate-500"}`}>{s.label}</p>
+                  <div className={`text-4xl font-bold tracking-tight mb-1 ${s.gradient ? "" : "text-slate-900 dark:text-white"}`}>{s.value}</div>
+                  <p className={`text-sm font-medium ${s.gradient ? "text-blue-100" : "text-slate-500 dark:text-zinc-400"}`}>{s.label}</p>
                 </CardContent>
               </Card>
             </motion.div>
@@ -222,29 +238,29 @@ export default function DashboardPage() {
 
         <div className="grid md:grid-cols-2 gap-6 mb-10">
           {/* Quick Actions */}
-          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 backdrop-blur-sm ring-1 ring-slate-100 overflow-hidden flex flex-col">
-            <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white px-6 py-5 border-b border-slate-100">
-              <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800 overflow-hidden flex flex-col">
+            <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 py-5 border-b border-slate-100 dark:border-zinc-800">
+              <CardTitle className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Zap className="h-5 w-5 text-amber-500" />
                 Quick Actions
               </CardTitle>
-              <CardDescription className="text-slate-500 mt-1">Manage your hospital visits</CardDescription>
+              <CardDescription className="text-slate-500 dark:text-zinc-400 mt-1">Manage your hospital visits</CardDescription>
             </CardHeader>
             <CardContent className="p-6 flex-1 flex flex-col justify-center space-y-4">
               <Link href="/join-queue" className="block w-full">
-                <motion.div whileHover={{ scale: 1.02 }} className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-white border border-blue-100 rounded-xl transition-all shadow-sm">
+                <motion.div whileHover={{ scale: 1.02 }} className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-white dark:from-blue-950/40 dark:to-zinc-800 dark:border-blue-900 rounded-xl transition-all shadow-sm">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Users className="h-5 w-5" /></div>
-                    <span className="font-bold text-slate-800">Join a New Queue</span>
+                    <span className="font-bold text-slate-800 dark:text-white">Join a New Queue</span>
                   </div>
                   <ArrowRight className="h-5 w-5 text-blue-600" />
                 </motion.div>
               </Link>
               <Link href="/book-appointment" className="block w-full">
-                <motion.div whileHover={{ scale: 1.02 }} className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white border border-purple-100 rounded-xl transition-all shadow-sm">
+                <motion.div whileHover={{ scale: 1.02 }} className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-white dark:from-purple-950/40 dark:to-zinc-800 dark:border-purple-900 rounded-xl transition-all shadow-sm">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-purple-100 text-purple-600 rounded-lg"><Calendar className="h-5 w-5" /></div>
-                    <span className="font-bold text-slate-800">Book Appointment</span>
+                    <span className="font-bold text-slate-800 dark:text-white">Book Appointment</span>
                   </div>
                   <ArrowRight className="h-5 w-5 text-purple-600" />
                 </motion.div>
@@ -253,13 +269,13 @@ export default function DashboardPage() {
           </Card>
 
           {/* Recent Activity */}
-          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 backdrop-blur-sm ring-1 ring-slate-100 overflow-hidden flex flex-col h-[400px]">
-            <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white px-6 py-5 border-b border-slate-100">
-              <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+          <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800 overflow-hidden flex flex-col h-[400px]">
+            <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 py-5 border-b border-slate-100 dark:border-zinc-800">
+              <CardTitle className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                 <Target className="h-5 w-5 text-emerald-500" />
                 Recent Activity
               </CardTitle>
-              <CardDescription className="text-slate-500 mt-1">Your latest queue and appointment history</CardDescription>
+              <CardDescription className="text-slate-500 dark:text-zinc-400 mt-1">Your latest queue and appointment history</CardDescription>
             </CardHeader>
             <CardContent className="flex-1 overflow-y-auto p-0">
               {activityLoading ? (
@@ -267,9 +283,9 @@ export default function DashboardPage() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               ) : activity.length === 0 ? (
-                <div className="text-center py-10 text-slate-500">
+                <div className="text-center py-10 text-slate-500 dark:text-zinc-400">
                   <Clock className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                  <p className="text-base font-medium text-slate-700">No recent activity</p>
+                  <p className="text-base font-medium text-slate-700 dark:text-zinc-300">No recent activity</p>
                   <p className="text-sm mt-1">Your queue entries and appointments will appear here</p>
                 </div>
               ) : (
@@ -277,10 +293,10 @@ export default function DashboardPage() {
                   {activity.map((item, i) => (
                     <motion.div key={item.id + item.type} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.04 }}
                       className="flex items-start gap-3 px-6 py-3.5 border-b border-slate-50 hover:bg-slate-50/60 transition-colors last:border-0">
-                      <div className="mt-0.5 p-1.5 bg-slate-100 rounded-lg">{activityIcon(item.type)}</div>
+                      <div className="mt-0.5 p-1.5 bg-slate-100 dark:bg-zinc-800 rounded-lg">{activityIcon(item.type)}</div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-slate-800 text-sm">{item.label}</p>
-                        <p className="text-xs text-slate-500 truncate">{item.detail}</p>
+                        <p className="font-semibold text-slate-800 dark:text-white text-sm">{item.label}</p>
+                        <p className="text-xs text-slate-500 dark:text-zinc-400 truncate">{item.detail}</p>
                       </div>
                       <p className="text-xs text-slate-400 whitespace-nowrap">{item.time}</p>
                     </motion.div>
@@ -292,13 +308,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Appointments Section */}
-        <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 backdrop-blur-sm ring-1 ring-slate-100 overflow-hidden">
-          <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white px-6 py-5 border-b border-slate-100">
-            <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+        <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800 overflow-hidden">
+          <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 py-5 border-b border-slate-100 dark:border-zinc-800">
+            <CardTitle className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <Calendar className="h-5 w-5 text-purple-600" />
               My Appointments
             </CardTitle>
-            <CardDescription className="text-slate-500 mt-1">Manage your upcoming appointments</CardDescription>
+            <CardDescription className="text-slate-500 dark:text-zinc-400 mt-1">Manage your upcoming appointments</CardDescription>
           </CardHeader>
           <CardContent className="p-6">
             {activityLoading ? (
@@ -306,9 +322,9 @@ export default function DashboardPage() {
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
             ) : appointments.length === 0 ? (
-              <div className="text-center py-10 text-slate-500">
+              <div className="text-center py-10 text-slate-500 dark:text-zinc-400">
                 <Calendar className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                <p className="text-base font-medium text-slate-700">No appointments found</p>
+                <p className="text-base font-medium text-slate-700 dark:text-zinc-300">No appointments found</p>
                 <Link href="/book-appointment">
                   <Button className="mt-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl">Book an Appointment</Button>
                 </Link>
@@ -317,17 +333,17 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {appointments.map((appt, i) => (
                   <motion.div key={appt.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl gap-4">
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-slate-50 dark:bg-zinc-800/60 border border-slate-100 dark:border-zinc-800 rounded-xl gap-4">
                     <div className="flex-1">
-                      <p className="font-bold text-slate-900">{appt.doctorName || "Doctor"}</p>
-                      <p className="text-sm text-slate-600">{appt.hospitalName} · {appt.departmentName}</p>
-                      <p className="text-sm text-slate-500 flex items-center gap-1 mt-1">
+                      <p className="font-bold text-slate-900 dark:text-white">{appt.doctorName || "Doctor"}</p>
+                      <p className="text-sm text-slate-600 dark:text-zinc-400">{appt.hospitalName} · {appt.departmentName}</p>
+                      <p className="text-sm text-slate-500 dark:text-zinc-400 flex items-center gap-1 mt-1">
                         <Calendar className="h-3.5 w-3.5" /> {appt.date} at {appt.time_slot}
                       </p>
                       <span className={`inline-flex mt-1 px-2 py-0.5 text-[10px] font-bold uppercase rounded-md border ${
                         appt.status === "confirmed" ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                         : appt.status === "pending" ? "bg-amber-50 text-amber-700 border-amber-200"
-                        : "bg-slate-100 text-slate-600 border-slate-200"
+                        : "bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-400 border-slate-200"
                       }`}>{appt.status}</span>
                     </div>
                     <div className="flex gap-2">
@@ -356,22 +372,22 @@ export default function DashboardPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-              <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+              className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-md border border-slate-100 dark:border-zinc-800 text-slate-900 dark:text-white">
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
                 <RefreshCw className="h-5 w-5 text-amber-500" /> Reschedule Appointment
               </h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">New Date</label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 mb-1">New Date</label>
                   <input type="date" value={rescheduleModal.newDate} min={new Date().toISOString().split("T")[0]}
                     onChange={e => setRescheduleModal(m => ({ ...m, newDate: e.target.value }))}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-1">New Time</label>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-zinc-300 mb-1">New Time</label>
                   <input type="time" value={rescheduleModal.newTime}
                     onChange={e => setRescheduleModal(m => ({ ...m, newTime: e.target.value }))}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                    className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
                 </div>
               </div>
               <div className="flex gap-3 mt-6">

@@ -39,15 +39,64 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Set Clerk publicMetadata role to "patient" only if no role is already set
-    // (preserves doctor/admin roles assigned elsewhere)
+    // Set Clerk publicMetadata role if not already set.
+    // If the email is registered in doctors table, assign "doctor", else "patient".
     const clerk = await clerkClient();
     const clerkUser = await clerk.users.getUser(userId);
-    const existingRole = (clerkUser.publicMetadata as any)?.role;
-    if (!existingRole) {
+    let role = (clerkUser.publicMetadata as any)?.role;
+
+    if (!role) {
+      const { data: doctorRecord } = await supabase
+        .from('doctors')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      role = doctorRecord ? 'doctor' : 'patient';
+
       await clerk.users.updateUserMetadata(userId, {
-        publicMetadata: { role: 'patient' },
+        publicMetadata: { role },
       });
+    }
+
+    // Bidirectional sync: If Clerk user has role "doctor", ensure they exist in Supabase `doctors` table
+    if (role === 'doctor') {
+      const { data: existingDoctor } = await supabase
+        .from('doctors')
+        .select('id')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (!existingDoctor) {
+        // Find default hospital and department
+        const { data: hosp } = await supabase.from('hospitals').select('id').limit(1).maybeSingle();
+        let deptId = null;
+        if (hosp) {
+          const { data: dept } = await supabase
+            .from('departments')
+            .select('id')
+            .eq('hospital_id', hosp.id)
+            .limit(1)
+            .maybeSingle();
+          deptId = dept?.id || null;
+        }
+
+        const formattedName = name.trim().startsWith('Dr.') ? name.trim() : `Dr. ${name.trim()}`;
+
+        await supabase.from('doctors').insert({
+          name: formattedName,
+          email,
+          phone: mobile || null,
+          hospital_id: hosp?.id || null,
+          department_id: deptId,
+          specialization: 'General Medicine',
+          qualification: 'MBBS, MD',
+          experience: 5,
+          rating: 4.9,
+          average_treatment_time: 15,
+          is_on_leave: false,
+        });
+      }
     }
 
     return NextResponse.json({

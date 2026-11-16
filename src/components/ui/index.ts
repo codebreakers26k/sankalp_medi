@@ -7,3 +7,6 @@ export { Label } from "./label";
 export { Toast, ToastProvider, ToastViewport } from "./toast";
 export { Toaster } from "./toaster";
 export { useToast } from "./use-toast";
+export { GlassCalendar } from "./glass-calendar";
+export { SunMoonThemeToggle } from "./sun-moon-theme-toggle";
+export type { SunMoonTheme, SunMoonThemeToggleProps } from "./sun-moon-theme-toggle";

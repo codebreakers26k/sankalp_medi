@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Users, Clock, Activity, AlertTriangle, Monitor, Volume2, User as UserIcon, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase/client";
+import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
 interface QueueEntry {
   id: string;
@@ -157,27 +158,28 @@ export default function DigitalWaitingRoom() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#090D16] text-zinc-900 dark:text-zinc-100 transition-colors duration-300">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md shadow-sm border-b border-[#E5E7EB] sticky top-0 z-50">
+      <header className="bg-white/80 dark:bg-[#090D16]/90 backdrop-blur-md shadow-sm border-b border-[#E5E7EB] dark:border-zinc-800 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Monitor className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Digital Waiting Room</h1>
-                <p className="text-sm text-gray-500">Live queue status for all patients</p>
+                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Digital Waiting Room</h1>
+                <p className="text-sm text-gray-500 dark:text-zinc-400">Live queue status for all patients</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm text-gray-500">Last Updated</p>
+                <p className="text-sm text-gray-500 dark:text-zinc-400">Last Updated</p>
                 <p className="text-sm font-medium">{lastUpdated.toLocaleTimeString()}</p>
               </div>
               <Button variant="outline" size="sm" onClick={() => setSoundEnabled(!soundEnabled)} className="flex items-center space-x-2">
                 <Volume2 className={`h-4 w-4 ${soundEnabled ? "text-green-600" : "text-gray-400"}`} />
                 <span>{soundEnabled ? "Sound On" : "Sound Off"}</span>
               </Button>
+              <SunMoonThemeToggle size={38} />
             </div>
           </div>
         </div>
@@ -275,22 +277,22 @@ export default function DigitalWaitingRoom() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Queue List */}
           <div className="lg:col-span-2">
-            <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 backdrop-blur-sm overflow-hidden ring-1 ring-slate-100">
-              <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white px-6 py-5 border-b border-slate-100">
+            <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm overflow-hidden ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800">
+              <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 py-5 border-b border-slate-100 dark:border-zinc-800">
                 <CardTitle className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3 text-xl font-bold text-slate-800">
+                  <div className="flex items-center space-x-3 text-xl font-bold text-slate-800 dark:text-white">
                     <div className="p-2.5 bg-blue-100/50 rounded-xl text-blue-600">
                       <Users className="h-5 w-5" />
                     </div>
                     <span>Current Queue</span>
                   </div>
-                  <div className="px-3 py-1 bg-slate-100 text-slate-600 rounded-full text-sm font-medium">
+                  <div className="px-3 py-1 bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 dark:text-zinc-300 rounded-full text-sm font-medium">
                     {waitingEntries.length} waiting
                   </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y divide-slate-100 max-h-[700px] overflow-y-auto">
+                <div className="divide-y divide-slate-100 dark:divide-zinc-800 max-h-[700px] overflow-y-auto">
                   <AnimatePresence>
                     {queueEntries.map((entry, index) => {
                       const patientsAhead = waitingEntries.filter(e => e.position < entry.position).length;
@@ -304,7 +306,7 @@ export default function DigitalWaitingRoom() {
                           exit={{ opacity: 0, scale: 0.95 }}
                           transition={{ duration: 0.3, delay: index * 0.05 }}
                           key={entry.id}
-                          className={`p-5 transition-all duration-300 hover:bg-slate-50 cursor-default ${
+                          className={`p-5 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-zinc-800/50 cursor-default ${
                             entry.isEmergency ? "bg-red-50/30"
                             : entry.status === "in-treatment" ? "bg-emerald-50/30"
                             : isMyEntry ? "bg-blue-50/40 ring-1 ring-blue-200"
@@ -316,25 +318,25 @@ export default function DigitalWaitingRoom() {
                               <div className={`w-14 h-14 rounded-full flex items-center justify-center font-bold text-xl shadow-sm ${
                                 entry.isEmergency ? "bg-red-100 text-red-600 border border-red-200"
                                 : isMyEntry ? "bg-blue-600 text-white border border-blue-500"
-                                : "bg-white text-blue-600 border border-slate-200"
+                                : "bg-white dark:bg-zinc-800 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-zinc-700"
                               }`}>
                                 {entry.position}
                               </div>
 
                               <div className="flex items-center space-x-4">
-                                <div className="hidden sm:flex items-center justify-center w-12 h-12 bg-slate-100 text-slate-400 rounded-full">
+                                <div className="hidden sm:flex items-center justify-center w-12 h-12 bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 rounded-full">
                                   <UserIcon className="h-6 w-6" />
                                 </div>
                                 <div>
-                                  <div className="font-bold text-lg text-slate-900 tracking-tight flex items-center gap-2">
+                                  <div className="font-bold text-lg text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                                     <span className="text-blue-600">#{entry.tokenNumber}</span>
-                                    <span className="text-slate-300">•</span>
+                                    <span className="text-slate-300 dark:text-zinc-600">•</span>
                                     <span>{entry.patientName}</span>
                                     {isMyEntry && <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200">You</span>}
                                   </div>
-                                  <div className="text-sm font-medium text-slate-500 mt-0.5 flex items-center gap-2">
+                                  <div className="text-sm font-medium text-slate-500 dark:text-zinc-400 mt-0.5 flex items-center gap-2">
                                     <span>{entry.doctorName}</span>
-                                    <span className="text-slate-300">|</span>
+                                    <span className="text-slate-300 dark:text-zinc-600">|</span>
                                     <span>{entry.departmentName}</span>
                                   </div>
                                   {entry.isEmergency && (
@@ -349,9 +351,9 @@ export default function DigitalWaitingRoom() {
                             <div className="text-right">
                               {entry.status === "waiting" ? (
                                 <>
-                                  <div className="text-lg font-black text-slate-800 tabular-nums">#{entry.tokenNumber}</div>
+                                  <div className="text-lg font-black text-slate-800 dark:text-white tabular-nums">#{entry.tokenNumber}</div>
                                   <div className="text-sm font-semibold text-blue-600 mt-0.5">{patientsAhead} ahead</div>
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 mt-1">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 dark:bg-zinc-800 text-slate-600 dark:text-zinc-300 dark:text-zinc-300 mt-1">
                                     Waiting
                                   </span>
                                 </>
@@ -371,7 +373,7 @@ export default function DigitalWaitingRoom() {
                   </AnimatePresence>
 
                   {queueEntries.length === 0 && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 text-slate-500">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16 text-slate-500 dark:text-zinc-400">
                       <Users className="h-16 w-16 mx-auto mb-4 text-slate-200" />
                       <p className="text-lg font-medium">No patients in queue</p>
                     </motion.div>
@@ -383,9 +385,9 @@ export default function DigitalWaitingRoom() {
 
           {/* Stats Panel */}
           <div className="space-y-6">
-            <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 backdrop-blur-sm overflow-hidden ring-1 ring-slate-100">
-              <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white px-6 py-5 border-b border-slate-100">
-                <CardTitle className="flex items-center space-x-3 text-lg font-bold text-slate-800">
+            <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm overflow-hidden ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800">
+              <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 py-5 border-b border-slate-100 dark:border-zinc-800">
+                <CardTitle className="flex items-center space-x-3 text-lg font-bold text-slate-800 dark:text-white">
                   <div className="p-2 bg-blue-100/50 rounded-lg text-blue-600">
                     <Activity className="h-4 w-4" />
                   </div>
@@ -395,25 +397,25 @@ export default function DigitalWaitingRoom() {
               <CardContent className="p-6">
                 <div className="space-y-5">
                   <div className="flex justify-between items-center group">
-                    <span className="text-sm font-medium text-slate-500">Total Waiting</span>
-                    <span className="font-bold text-xl text-slate-900 tabular-nums bg-slate-100 px-3 py-1 rounded-md">
+                    <span className="text-sm font-medium text-slate-500 dark:text-zinc-400">Total Waiting</span>
+                    <span className="font-bold text-xl text-slate-900 dark:text-white tabular-nums bg-slate-100 dark:bg-zinc-800 px-3 py-1 rounded-md">
                       {queueEntries.filter(q => q.status === "waiting").length}
                     </span>
                   </div>
                   <div className="flex justify-between items-center group">
-                    <span className="text-sm font-medium text-slate-500">In Treatment</span>
+                    <span className="text-sm font-medium text-slate-500 dark:text-zinc-400">In Treatment</span>
                     <span className="font-bold text-xl text-emerald-600 tabular-nums bg-emerald-50 px-3 py-1 rounded-md">
                       {queueEntries.filter(q => q.status === "in-treatment").length}
                     </span>
                   </div>
                   <div className="flex justify-between items-center group">
-                    <span className="text-sm font-medium text-slate-500">Emergency Cases</span>
+                    <span className="text-sm font-medium text-slate-500 dark:text-zinc-400">Emergency Cases</span>
                     <span className="font-bold text-xl text-red-600 tabular-nums bg-red-50 px-3 py-1 rounded-md">
                       {queueEntries.filter(q => q.isEmergency).length}
                     </span>
                   </div>
-                  <div className="flex justify-between items-center group pt-4 border-t border-slate-100">
-                    <span className="text-sm font-semibold text-slate-700">Avg Wait Time</span>
+                  <div className="flex justify-between items-center group pt-4 border-t border-slate-100 dark:border-zinc-800">
+                    <span className="text-sm font-semibold text-slate-700 dark:text-zinc-300">Avg Wait Time</span>
                     <span className="font-bold text-xl text-blue-600 tabular-nums bg-blue-50 px-3 py-1 rounded-md">
                       {waitingEntries.length > 0
                         ? `~${Math.round(waitingEntries.reduce((s, q) => s + q.estimatedWaitTime, 0) / waitingEntries.length)} min`
@@ -424,9 +426,9 @@ export default function DigitalWaitingRoom() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 backdrop-blur-sm overflow-hidden ring-1 ring-slate-100">
-              <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white px-6 py-5 border-b border-slate-100">
-                <CardTitle className="flex items-center space-x-3 text-lg font-bold text-slate-800">
+            <Card className="border-0 shadow-xl shadow-slate-200/50 rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm overflow-hidden ring-1 ring-slate-100 dark:ring-zinc-800 border border-transparent dark:border-zinc-800">
+              <CardHeader className="bg-gradient-to-b from-slate-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 py-5 border-b border-slate-100 dark:border-zinc-800">
+                <CardTitle className="flex items-center space-x-3 text-lg font-bold text-slate-800 dark:text-white">
                   <div className="p-2 bg-purple-100/50 rounded-lg text-purple-600">
                     <Clock className="h-4 w-4" />
                   </div>
@@ -438,18 +440,18 @@ export default function DigitalWaitingRoom() {
                   {Array.from(new Set(queueEntries.map(q => q.departmentName))).map(dept => {
                     const deptQueue = queueEntries.filter(q => q.departmentName === dept && q.status === "waiting");
                     return (
-                      <div key={dept} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                      <div key={dept} className="flex justify-between items-center p-3 hover:bg-slate-50 dark:hover:bg-zinc-800/50 rounded-xl transition-colors">
                         <div className="flex items-center gap-3">
                           <div className="w-2 h-2 rounded-full bg-blue-500" />
-                          <span className="text-sm font-semibold text-slate-700">{dept}</span>
+                          <span className="text-sm font-semibold text-slate-700 dark:text-zinc-300">{dept}</span>
                         </div>
-                        <span className="text-sm font-bold text-slate-900 bg-white shadow-sm border border-slate-100 px-3 py-1 rounded-full tabular-nums">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white bg-white dark:bg-zinc-800 shadow-sm border border-slate-100 dark:border-zinc-700 px-3 py-1 rounded-full tabular-nums">
                           {deptQueue.length} waiting
                         </span>
                       </div>
                     );
                   })}
-                  {queueEntries.length === 0 && <p className="text-sm text-slate-500 text-center py-4">No active departments</p>}
+                  {queueEntries.length === 0 && <p className="text-sm text-slate-500 dark:text-zinc-400 text-center py-4">No active departments</p>}
                 </div>
               </CardContent>
             </Card>

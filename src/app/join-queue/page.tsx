@@ -14,6 +14,7 @@ import { QRCodePopup } from "@/components/QRCodePopup";
 import { EmergencyButton } from "@/components/EmergencyButton";
 import { QueueStatusWidget } from "@/components/QueueStatusWidget";
 import { notificationService } from "@/lib/services/notificationService";
+import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
 export default function JoinQueuePage() {
   const router = useRouter();
@@ -274,24 +275,26 @@ export default function JoinQueuePage() {
         />
       </div>
 
-      <header className="bg-white/70 backdrop-blur-xl border-b border-[#E5E7EB] sticky top-0 z-50">
+      <header className="bg-white/70 dark:bg-[#090D16]/80 backdrop-blur-xl border-b border-[#E5E7EB] dark:border-zinc-800 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <Link href="/" className="flex items-center space-x-2 group">
-              <div className="p-2 bg-gray-50 rounded-full group-hover:bg-blue-50 transition-colors">
-                <ArrowLeft className="h-5 w-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
+              <div className="p-2 bg-gray-50 dark:bg-zinc-800 rounded-full group-hover:bg-blue-50 transition-colors">
+                <ArrowLeft className="h-5 w-5 text-slate-500 dark:text-zinc-400 group-hover:text-blue-600 transition-colors" />
               </div>
-              <span className="text-slate-600 font-medium group-hover:text-slate-900 transition-colors">Back</span>
+              <span className="text-slate-600 dark:text-zinc-400 dark:text-zinc-300 font-medium group-hover:text-slate-900 dark:text-white dark:group-hover:text-white transition-colors">Back</span>
             </Link>
             <div className="flex items-center space-x-3">
-              <div className="p-2.5 bg-blue-100 rounded-xl">
-                <Hospital className="h-6 w-6 text-[#2563EB]" />
+              <div className="p-2.5 bg-blue-100 dark:bg-blue-900/40 rounded-xl">
+                <Hospital className="h-6 w-6 text-[#2563EB] dark:text-blue-400" />
               </div>
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                 MediQueue
               </h1>
             </div>
-            <div className="w-24"></div>
+            <div className="w-24 flex justify-end">
+              <SunMoonThemeToggle size={38} />
+            </div>
           </div>
         </div>
       </header>
@@ -312,15 +315,15 @@ export default function JoinQueuePage() {
             </motion.div>
           )}
           
-          <Card className="border-0 shadow-xl shadow-blue-900/5 ring-1 ring-gray-100 rounded-2xl overflow-hidden bg-white/90 backdrop-blur-sm">
-          <CardHeader className="bg-gradient-to-b from-gray-50/50 to-white px-8 py-6 border-b border-gray-100">
-            <CardTitle className="flex items-center gap-3 text-2xl font-bold text-slate-900">
+          <Card className="border-0 shadow-xl shadow-blue-900/5 ring-1 ring-gray-100 dark:ring-zinc-800 rounded-2xl overflow-hidden bg-white/90 dark:bg-zinc-900/90 backdrop-blur-sm border border-transparent dark:border-zinc-800">
+          <CardHeader className="bg-gradient-to-b from-gray-50/50 to-white dark:from-zinc-800/50 dark:to-zinc-900 px-6 sm:px-8 py-6 border-b border-gray-100 dark:border-zinc-800">
+            <CardTitle className="flex items-center gap-3 text-2xl font-bold text-slate-900 dark:text-white">
               <div className="p-2.5 bg-blue-100/50 rounded-xl text-blue-600">
                 <Users className="h-6 w-6" />
               </div>
               Join Hospital Queue
             </CardTitle>
-            <CardDescription className="text-slate-500 text-base mt-2">
+            <CardDescription className="text-slate-500 dark:text-zinc-400 text-base mt-2">
               Fill in your details to join the queue at your selected hospital and department
             </CardDescription>
           </CardHeader>
@@ -328,7 +331,7 @@ export default function JoinQueuePage() {
             <form onSubmit={handleSubmit} className="p-2 space-y-8">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Select Hospital
                   </label>
                   <div className="relative">
@@ -344,7 +347,7 @@ export default function JoinQueuePage() {
                         setDoctors([]);
                       }}
                       required
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 appearance-none"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 appearance-none"
                     >
                       <option value="">Choose a hospital...</option>
                       {hospitals.map((hospital) => (
@@ -357,7 +360,7 @@ export default function JoinQueuePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Select Department
                   </label>
                   <div className="relative">
@@ -372,7 +375,7 @@ export default function JoinQueuePage() {
                       }}
                       required
                       disabled={!selectedHospital}
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
                     >
                       <option value="">Choose a department...</option>
                       {departments.map((department) => (
@@ -386,7 +389,7 @@ export default function JoinQueuePage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-700">
+                <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                   Select Doctor
                 </label>
                 <div className="relative">
@@ -398,7 +401,7 @@ export default function JoinQueuePage() {
                     onChange={(e) => setSelectedDoctor(e.target.value)}
                     required
                     disabled={!selectedDepartment}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed appearance-none"
                   >
                     <option value="">Choose a doctor...</option>
                     {doctors.map((doctor) => (
@@ -412,7 +415,7 @@ export default function JoinQueuePage() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Full Name
                   </label>
                   <div className="relative group">
@@ -425,13 +428,13 @@ export default function JoinQueuePage() {
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                       placeholder="Enter your full name"
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Email Address
                   </label>
                   <div className="relative group">
@@ -444,7 +447,7 @@ export default function JoinQueuePage() {
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       required
                       placeholder="you@example.com"
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                     />
                   </div>
                 </div>
@@ -452,7 +455,7 @@ export default function JoinQueuePage() {
 
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Age
                   </label>
                   <div className="relative group">
@@ -464,13 +467,13 @@ export default function JoinQueuePage() {
                       min="1"
                       max="120"
                       placeholder="Your age"
-                      className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                      className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-semibold text-slate-700">
+                  <label className="text-sm font-semibold text-slate-700 dark:text-zinc-300">
                     Date of Birth
                   </label>
                   <div className="relative group">
@@ -482,7 +485,7 @@ export default function JoinQueuePage() {
                       value={formData.dob}
                       onChange={(e) => setFormData({ ...formData, dob: e.target.value })}
                       required
-                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
+                      className="w-full pl-11 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition-all hover:bg-slate-50"
                     />
                   </div>
                 </div>
@@ -502,7 +505,7 @@ export default function JoinQueuePage() {
 
               <div className="flex flex-col sm:flex-row gap-4 pt-4">
                 <Link href="/" className="flex-1">
-                  <Button type="button" variant="outline" className="w-full py-6 text-base font-medium rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-all">
+                  <Button type="button" variant="outline" className="w-full py-6 text-base font-medium rounded-xl border-slate-200 text-slate-600 dark:text-zinc-400 hover:bg-slate-50 hover:text-slate-900 dark:text-white transition-all">
                     Cancel
                   </Button>
                 </Link>
@@ -519,7 +522,7 @@ export default function JoinQueuePage() {
             {/* Emergency Button */}
             <div className="border-t border-slate-100 pt-8 mt-8 pb-4">
               <div className="text-center">
-                <p className="text-sm font-medium text-slate-500 mb-4 tracking-wide uppercase">
+                <p className="text-sm font-medium text-slate-500 dark:text-zinc-400 mb-4 tracking-wide uppercase">
                   Require Immediate Attention?
                 </p>
                 <motion.div whileHover={{ scale: 1.02 }}>
