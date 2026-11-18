@@ -1,36 +1,39 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`].(https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MediQueue
 
-## Getting Started
+MediQueue is a hospital queue and appointment platform with a React interface and a Java Spring Boot backend.
 
-First, run the development server:
+## Architecture
+
+- `src/` — Next.js 16 / React 19 user interface
+- `backend/` — Java 17 Spring Boot REST API
+- PostgreSQL/Supabase — database
+- Supabase Storage — hospital license documents, accessed only by Java
+- Clerk — authentication and role metadata
+
+All application requests use `/backend-api/*`. The Next.js proxy adds the Clerk token and forwards them to Spring Boot at `/api/*`. There is no second JavaScript business-logic backend.
+
+## Run locally
+
+Configure the single ignored root `.env`, then run:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:8080/api`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Flyway applies the schema automatically when Spring Boot starts.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Verify
 
-## Learn More
+```bash
+mvn -f backend/pom.xml test
+npx tsc --noEmit --incremental false
+npm run build
+```
 
-To learn more about Next.js, take a look at the following resources:
+See [SETUP_GUIDE.md](SETUP_GUIDE.md), [SUPABASE_SETUP.md](SUPABASE_SETUP.md), and [RBAC_FLOW.md](RBAC_FLOW.md).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Never commit `.env`, database passwords, Clerk secrets, SMTP credentials, or Supabase server keys.

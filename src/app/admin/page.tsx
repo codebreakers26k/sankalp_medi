@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase/client";
 import ProfileDropdown, { Account, ProfileMenuItem } from "@/components/kokonutui/profile-dropdown";
 import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
@@ -65,65 +64,32 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (isLoaded && isSignedIn && (user?.publicMetadata?.role as string) === "admin") {
       fetchAll();
-      const sub = supabase.channel("admin-realtime")
-        .on("postgres_changes", { event: "*", schema: "public", table: "queue" }, () => fetchAll())
-        .on("postgres_changes", { event: "*", schema: "public", table: "doctors" }, () => fetchAll())
-        .subscribe();
-      return () => { sub.unsubscribe(); };
+      const refresh = window.setInterval(fetchAll, 15_000);
+      return () => window.clearInterval(refresh);
     }
   }, [isLoaded, isSignedIn]);
 
   const fetchAll = async () => {
     try {
-      const [hospRes, docRes, ctrRes, deptRes, queueRes, apptRes] = await Promise.all([
-        supabase.from("hospitals").select("*").order("name"),
-        supabase.from("doctors").select("*", { count: "exact", head: true }).eq("is_on_leave", false),
-        supabase.from("counters").select("*, departments(name), doctors(id, name, specialization)"),
-        supabase.from("departments").select("*", { count: "exact", head: true }),
-        supabase.from("queue").select("*").eq("status", "waiting"),
-        supabase.from("appointments").select("*", { count: "exact", head: true }).gte("date", new Date().toISOString().split("T")[0]),
-      ]);
-
-      setResources({
-        hospitals: hospRes.data?.length || 0,
-        doctors: docRes.count || 0,
-        counters: ctrRes.data?.length || 0,
-        departments: deptRes.count || 0,
-      });
-
-      const queueData = queueRes.data || [];
-      const avgWait = queueData.length > 0
-        ? Math.round(queueData.reduce((s, q) => s + (q.estimated_wait_time || 0), 0) / queueData.length)
-        : 0;
-
-      setAnalytics({
-        avgWaitTime: avgWait,
-        patientsServed: apptRes.count || 0,
-        peakTraffic: "2-4 PM",
-        appointmentRate: apptRes.count || 0,
-      });
+      const response = await fetch('/backend-api/admin/overview');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to load admin data');
+      const data = result.data;
+      setResources(data.resources);
+      setAnalytics(data.analytics);
+      const queueData = data.queue || [];
 
       // AI: check queue overload per hospital
       const alerts: string[] = [];
-      (hospRes.data || []).forEach(h => {
-        const hQueue = queueData.filter(q => q.hospital_id === h.id).length;
+      (data.hospitals || []).forEach((h: any) => {
+        const hQueue = queueData.filter((q: any) => q.hospital_id === h.id).length;
         if (hQueue >= QUEUE_OVERLOAD_THRESHOLD) {
           alerts.push(`Queue overload at ${h.name} (${hQueue} waiting). Consider opening an additional counter.`);
         }
       });
       setAiAlerts(alerts);
 
-      // Build hospitals with counters and queue data
-      const hospitalsWithData = await Promise.all(
-        (hospRes.data || []).map(async (hospital) => {
-          const counters = (ctrRes.data || []).filter(c => c.hospital_id === hospital.id);
-          const queueCount = queueData.filter(q => q.hospital_id === hospital.id).length;
-          const depts = await supabase.from("departments").select("*").eq("hospital_id", hospital.id);
-          const docs = await supabase.from("doctors").select("*", { count: "exact", head: true }).eq("hospital_id", hospital.id);
-          return { ...hospital, counters, queueCount, departmentList: depts.data || [], doctorCount: docs.count || 0 };
-        })
-      );
-      setHospitals(hospitalsWithData);
+      setHospitals(data.hospitals || []);
     } catch (error) {
       console.error("Error fetching admin data:", error);
     } finally {

@@ -46,12 +46,25 @@ export default function LiveQueuePage() {
   useEffect(() => {
     const fetchQueueStatus = async () => {
       try {
-        const response = await fetch(`/api/queue/status?locationId=${selectedLocation}`);
+        const response = await fetch(`/backend-api/queue/status?locationId=${selectedLocation}`);
         const data = await response.json();
         
         if (data.success) {
-          setQueue(data.data.queue);
-          setCounters(data.data.counters);
+          setQueue((data.data.queue || []).map((item: any) => ({
+            id: item.id,
+            name: item.patient_name || `Token ${item.token_number}`,
+            priority: item.priority || (item.is_emergency ? "emergency" : "regular"),
+            arrivalTime: item.arrival_time || item.created_at,
+            estimatedWaitTime: item.estimated_wait_time || 0,
+            serviceType: item.service_type || item.treatment_type || "Consultation",
+            position: item.position,
+          })));
+          setCounters((data.data.counters || []).map((counter: any) => ({
+            ...counter,
+            currentCustomerId: counter.current_patient_id,
+            queueLength: counter.queue_length || 0,
+            averageServiceTime: counter.average_service_time || 0,
+          })));
           setMetrics(data.data.metrics);
           setRecommendations(data.data.recommendations);
         }

@@ -9,7 +9,6 @@ import {
   UserCheck, UserX, LogOut
 } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
@@ -117,22 +116,27 @@ export default function AdminDoctorsPage() {
   }, [form.hospital_id]);
 
   const fetchHospitals = async () => {
-    const { data } = await supabase.from("hospitals").select("id, name, city").order("name");
-    setHospitals(data || []);
+    const response = await fetch('/backend-api/hospitals');
+    const result = await response.json();
+    setHospitals(result.data || []);
   };
 
   const fetchDepartments = async (hospitalId: string) => {
-    const { data } = await supabase.from("departments").select("id, name").eq("hospital_id", hospitalId).order("name");
-    setDepartments(data || []);
+    const response = await fetch(`/backend-api/departments?hospitalId=${encodeURIComponent(hospitalId)}`);
+    const result = await response.json();
+    setDepartments(result.data || []);
   };
 
   const fetchDoctors = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from("doctors")
-      .select("*, hospitals(name, city), departments(name)")
-      .order("created_at", { ascending: false });
-    setDoctors(data || []);
+    const response = await fetch('/backend-api/admin/doctors');
+    const result = await response.json();
+    const data = (result.data || []).map((doctor: any) => ({
+      ...doctor,
+      hospitals: { name: doctor.hospital_name, city: doctor.hospital_city },
+      departments: { name: doctor.department_name },
+    }));
+    setDoctors(data);
     setLoading(false);
   };
 
@@ -144,13 +148,14 @@ export default function AdminDoctorsPage() {
   const handleAddDepartment = async () => {
     if (!newDeptName.trim() || !form.hospital_id) return;
     setAddingDept(true);
-    const { data, error } = await supabase
-      .from("departments")
-      .insert({ name: newDeptName.trim(), hospital_id: form.hospital_id })
-      .select()
-      .single();
+    const response = await fetch('/backend-api/admin/departments', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: newDeptName.trim(), hospital_id: form.hospital_id }),
+    });
+    const result = await response.json();
     setAddingDept(false);
-    if (error) { showToast("error", "Failed to create department: " + error.message); return; }
+    if (!response.ok) { showToast("error", "Failed to create department: " + (result.error || 'Unknown error')); return; }
+    const data = result.data;
     setDepartments(prev => [...prev, data]);
     setForm(f => ({ ...f, department_id: data.id }));
     setNewDeptName("");
@@ -174,25 +179,15 @@ export default function AdminDoctorsPage() {
       average_treatment_time: parseInt(form.average_treatment_time) || 15,
     };
 
-    const { error } = editingId
-      ? await supabase.from("doctors").update(payload).eq("id", editingId)
-      : await supabase.from("doctors").insert(payload);
+    const response = await fetch(editingId ? `/backend-api/admin/doctors/${editingId}` : '/backend-api/admin/doctors', {
+      method: editingId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
 
     setSaving(false);
-    if (error) { showToast("error", error.message); return; }
-
-    // Assign doctor role in Clerk for new registrations
-    if (!editingId) {
-      try {
-        await fetch("/api/set-role", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: form.email, role: "doctor" }),
-        });
-      } catch {
-        // Non-blocking — doctor record is saved; role will be assigned when they sign in
-      }
-    }
+    if (!response.ok) { showToast("error", result.error || 'Failed to save doctor'); return; }
 
     showToast("success", editingId ? "Doctor updated successfully." : "Doctor added successfully.");
     resetForm();
@@ -225,16 +220,22 @@ export default function AdminDoctorsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("doctors").delete().eq("id", id);
-    if (error) { showToast("error", error.message); return; }
+    const response = await fetch(`/backend-api/admin/doctors/${id}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) { showToast("error", result.error || 'Failed to remove doctor'); return; }
     showToast("success", "Doctor removed.");
     setDeleteConfirm(null);
     fetchDoctors();
   };
 
   const toggleLeave = async (id: string, current: boolean) => {
-    await supabase.from("doctors").update({ is_on_leave: !current }).eq("id", id);
-    fetchDoctors();
+    const response = await fetch(`/backend-api/admin/doctors/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_on_leave: !current }),
+    });
+    if (!response.ok) { showToast("error", "Failed to update leave status"); return; }
+    await fetchDoctors();
   };
 
   // Group doctors by hospital for the table view

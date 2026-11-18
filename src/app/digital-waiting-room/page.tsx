@@ -6,14 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Clock, Activity, AlertTriangle, Monitor, Volume2, User as UserIcon, XCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase/client";
 import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
 interface QueueEntry {
   id: string;
   tokenNumber: number;
   patientName: string;
-  patientId: string;
+  patientId?: string;
   hospitalName: string;
   departmentName: string;
   doctorName: string;
@@ -32,45 +31,28 @@ export default function DigitalWaitingRoom() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [myActiveQueueIds, setMyActiveQueueIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetchQueueData();
-
-    const subscription = supabase
-      .channel("digital-waiting-room")
-      .on("postgres_changes", { event: "*", schema: "public", table: "queue" }, () => {
-        fetchQueueData();
-        setLastUpdated(new Date());
-      })
-      .subscribe();
-
-    return () => { subscription.unsubscribe(); };
-  }, []);
+    const interval = window.setInterval(fetchQueueData, 10_000);
+    return () => window.clearInterval(interval);
+  }, [isSignedIn]);
 
   const fetchQueueData = async () => {
     try {
-      const { data, error } = await supabase
-        .from("queue")
-        .select(`
-          *,
-          hospitals!queue_hospital_id_fkey(name),
-          departments!queue_department_id_fkey(name),
-          doctors!queue_doctor_id_fkey(name)
-        `)
-        .in("status", ["waiting", "in-treatment"])
-        .order("is_emergency", { ascending: false })
-        .order("position", { ascending: true });
+      const response = await fetch("/backend-api/queue/live", { cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const { data } = await response.json();
 
-      if (error) throw error;
-
-      const formattedData = (data || []).map(item => ({
+      const formattedData = (data || []).map((item: any) => ({
         id: item.id,
         tokenNumber: item.token_number,
         patientName: item.patient_name,
         patientId: item.patient_id,
-        hospitalName: item.hospitals?.name || "Unknown Hospital",
-        departmentName: item.departments?.name || "Unknown Department",
-        doctorName: item.doctors?.name || "Available Doctor",
+        hospitalName: item.hospital_name || "Unknown Hospital",
+        departmentName: item.department_name || "Unknown Department",
+        doctorName: item.doctor_name || "Available Doctor",
         estimatedWaitTime: item.estimated_wait_time || 0,
         position: item.position || 0,
         status: item.status,
@@ -79,7 +61,16 @@ export default function DigitalWaitingRoom() {
       }));
 
       setQueueEntries(formattedData);
-      const calledPatient = formattedData.find(q => q.status === "in-treatment" && q.calledAt);
+      if (isSignedIn) {
+        const mineResponse = await fetch("/backend-api/users/me/dashboard", { cache: "no-store" });
+        if (mineResponse.ok) {
+          const mine = await mineResponse.json();
+          setMyActiveQueueIds((mine.data?.queue || [])
+            .filter((entry: any) => entry.status === "waiting" || entry.status === "in-treatment")
+            .map((entry: any) => entry.id));
+        }
+      }
+      const calledPatient = formattedData.find((q: QueueEntry) => q.status === "in-treatment" && q.calledAt);
       if (calledPatient) setCurrentCall(calledPatient);
       else setCurrentCall(null);
     } catch (error) {
@@ -111,29 +102,11 @@ export default function DigitalWaitingRoom() {
     if (!confirm("Are you sure you want to cancel your queue position?")) return;
     setCancellingId(entryId);
     try {
-      // Get the position of the entry being cancelled
       const entry = queueEntries.find(e => e.id === entryId);
       if (!entry) return;
-
-      // Cancel the entry
-      await supabase.from("queue").update({ status: "cancelled" }).eq("id", entryId);
-
-      // Reassign token numbers and positions for remaining waiting patients
-      const remaining = queueEntries
-        .filter(e => e.id !== entryId && e.status === "waiting" && e.position > entry.position)
-        .sort((a, b) => a.position - b.position);
-
-      for (const patient of remaining) {
-        await supabase
-          .from("queue")
-          .update({
-            position: patient.position - 1,
-            estimated_wait_time: Math.max(0, (patient.position - 1) * 15),
-          })
-          .eq("id", patient.id);
-      }
-
-      fetchQueueData();
+      const response = await fetch(`/backend-api/queue/mine/${entryId}/cancel`, { method: "PATCH" });
+      if (!response.ok) throw new Error(await response.text());
+      await fetchQueueData();
     } catch (err) {
       console.error("Error cancelling queue:", err);
       alert("Failed to cancel queue. Please try again.");
@@ -144,7 +117,7 @@ export default function DigitalWaitingRoom() {
 
   // Find current user's queue entry
   const myQueueEntry = isSignedIn && user
-    ? queueEntries.find(e => e.patientId === user.id && e.status === "waiting")
+    ? queueEntries.find(e => myActiveQueueIds.includes(e.id) && e.status === "waiting")
     : null;
 
   const waitingEntries = queueEntries.filter(e => e.status === "waiting");

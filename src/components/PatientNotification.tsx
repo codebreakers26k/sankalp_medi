@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Bell, X, Volume2 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 
 interface PatientNotificationProps {
   patientId: string;
@@ -15,41 +14,24 @@ export function PatientNotification({ patientId }: PatientNotificationProps) {
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   useEffect(() => {
-    const subscribeToPatientCalls = async () => {
-      // Subscribe to queue changes for this patient
-      const subscription = supabase
-        .channel(`patient-${patientId}`)
-        .on('postgres_changes', 
-          { 
-            event: 'UPDATE', 
-            schema: 'public', 
-            table: 'queue',
-            filter: `patient_id=eq.${patientId}`
-          }, 
-          (payload) => {
-            if (payload.new.status === 'in-treatment' && payload.new.called_at) {
-              setNotification({
-                tokenNumber: payload.new.token_number,
-                doctorName: payload.new.doctor_id, // This would need to be joined
-                departmentName: payload.new.department_id, // This would need to be joined
-                calledAt: payload.new.called_at
-              });
-              
-              if (soundEnabled) {
-                playNotificationSound();
-              }
-            }
-          }
-        )
-        .subscribe();
-
-      return () => subscription.unsubscribe();
+    const checkPatientCall = async () => {
+      const response = await fetch("/backend-api/users/me/dashboard", { cache: "no-store" });
+      if (!response.ok) return;
+      const result = await response.json();
+      const called = (result.data?.queue || []).find((entry: any) => entry.status === "in-treatment");
+      if (called && called.id !== notification?.id) {
+        setNotification({ id: called.id, tokenNumber: called.token_number, doctorName: called.doctor_name,
+          departmentName: called.department_name, calledAt: called.called_at });
+        if (soundEnabled) playNotificationSound();
+      }
     };
 
     if (patientId) {
-      subscribeToPatientCalls();
+      checkPatientCall();
+      const interval = window.setInterval(checkPatientCall, 10_000);
+      return () => window.clearInterval(interval);
     }
-  }, [patientId, soundEnabled]);
+  }, [patientId, soundEnabled, notification?.id]);
 
   const playNotificationSound = () => {
     // Create a notification sound

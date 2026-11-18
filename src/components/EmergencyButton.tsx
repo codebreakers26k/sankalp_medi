@@ -39,7 +39,7 @@ export function EmergencyButton({ hospitalId, departmentId, onEmergencyCreated }
       }
 
       // Create emergency queue entry via API
-      const response = await fetch('/api/emergency-queue', {
+      const response = await fetch('/backend-api/emergency-queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

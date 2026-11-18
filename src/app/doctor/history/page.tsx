@@ -5,7 +5,6 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Clock, CheckCircle2, User, Search, RefreshCw, LogOut } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 import { DoctorNav } from "@/components/doctor/DoctorNav";
 
 interface HistoryRecord {
@@ -45,23 +44,10 @@ export default function DoctorHistoryPage() {
 
   const fetchHistory = async () => {
     try {
-      const { data: doctor } = await supabase
-        .from("doctors")
-        .select("id")
-        .eq("email", user?.primaryEmailAddress?.emailAddress)
-        .maybeSingle();
-
-      const docId = doctor?.id || user?.id;
-
-      const { data } = await supabase
-        .from("queue")
-        .select("*")
-        .eq("doctor_id", docId)
-        .eq("status", "completed")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      setHistory(data || []);
+      const response = await fetch("/backend-api/doctor/workspace", { cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const { data } = await response.json();
+      setHistory(data.history || []);
     } catch (err) {
       console.error("Error fetching history:", err);
     } finally {

@@ -11,7 +11,7 @@
  */
 
 import { RotateCw, Upload, X } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   type ChangeEvent,
   type ClipboardEvent,

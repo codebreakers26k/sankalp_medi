@@ -5,12 +5,16 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, ArrowLeft, Clock, User as UserIcon, X, Hospital, Activity, Mail, Phone, CheckCircle2, UserCheck, Sparkles } from "lucide-react";
+import { Calendar, ArrowLeft, Clock, User as UserIcon, X, Hospital, Activity, Mail, Phone, CheckCircle2, UserCheck, Sparkles, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { supabase } from "@/lib/supabase/client";
-import { notificationService } from "@/lib/services/notificationService";
 import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
+
+const formatDoctorName = (name?: string | null) => {
+  const trimmedName = name?.trim();
+  if (!trimmedName) return "Doctor";
+  return /^dr\.?\s/i.test(trimmedName) ? trimmedName : `Dr. ${trimmedName}`;
+};
 
 export default function BookAppointmentPage() {
   const { user, isLoaded, isSignedIn } = useUser();
@@ -21,6 +25,8 @@ export default function BookAppointmentPage() {
   const [appointmentDate, setAppointmentDate] = useState("");
   const [timeSlot, setTimeSlot] = useState("");
   const [hospitals, setHospitals] = useState<any[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
   const [departments, setDepartments] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -68,17 +74,11 @@ export default function BookAppointmentPage() {
   }, [isLoaded, isSignedIn, user, router]);
 
   useEffect(() => {
-    fetchHospitals();
-    if (user) {
-      fetchUserAppointments();
-    }
-  }, [user]);
-
-  useEffect(() => {
     if (isLoaded && isSignedIn) {
       fetchHospitals();
+      if (user) fetchUserAppointments();
     }
-  }, [isLoaded, isSignedIn]);
+  }, [isLoaded, isSignedIn, user]);
 
   useEffect(() => {
     if (selectedHospital) {
@@ -108,23 +108,14 @@ export default function BookAppointmentPage() {
   // Fetch user appointments
   const fetchUserAppointments = async () => {
     if (!user) return;
-    
     try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('patient_id', user.id)
-        .in('status', ['pending', 'confirmed'])
-        .order('date', { ascending: true })
-        .order('time_slot', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching appointments:', error);
-      } else {
-        setUserAppointments(data || []);
-      }
+      const response = await fetch('/backend-api/appointments/mine');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to load appointments');
+      setUserAppointments((result.data || []).filter((appointment: any) =>
+        appointment.status === 'pending' || appointment.status === 'confirmed'));
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+      console.warn('Appointments are temporarily unavailable:', error);
     }
   };
 
@@ -138,7 +129,7 @@ export default function BookAppointmentPage() {
     if (!rescheduleData || !user) return;
 
     try {
-      const response = await fetch('/api/appointments/reschedule', {
+      const response = await fetch('/backend-api/appointments/reschedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -175,7 +166,7 @@ export default function BookAppointmentPage() {
     if (!cancelData || !user) return;
 
     try {
-      const response = await fetch('/api/appointments/cancel', {
+      const response = await fetch('/backend-api/appointments/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -205,7 +196,7 @@ export default function BookAppointmentPage() {
     if (!aiSymptoms.trim()) return;
     setAiLoading(true);
     try {
-      const res = await fetch("/api/ai/triage", {
+      const res = await fetch("/backend-api/ai/triage", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symptoms: aiSymptoms }),
@@ -248,7 +239,7 @@ export default function BookAppointmentPage() {
     if (!waitlistData || !user) return;
 
     try {
-      const response = await fetch('/api/appointments/waitlist', {
+      const response = await fetch('/backend-api/appointments/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -273,83 +264,52 @@ export default function BookAppointmentPage() {
   };
 
   const fetchHospitals = async () => {
+    setCatalogLoading(true);
+    setCatalogError(null);
     try {
-      console.log('Fetching hospitals...');
-      const response = await fetch('/api/hospitals');
+      const response = await fetch('/backend-api/hospitals');
       const result = await response.json();
-      
-      console.log('Hospitals API response:', {
-        status: response.status,
-        ok: response.ok,
-        data: result
-      });
-      
+
       if (!response.ok) {
-        console.error('Error fetching hospitals:', result.error);
-        // Don't alert — just log it; hospitals will be empty
+        setHospitals([]);
+        setCatalogError(result.error || 'Hospitals are temporarily unavailable.');
         return;
       }
       
       if (!result.data || result.data.length === 0) {
         console.warn('No hospitals found in database');
-        // Add sample hospitals if none exist
-        const sampleHospitals = [
-          { id: 'sample-1', name: 'City General Hospital', address: '123 Main St', city: 'New York' },
-          { id: 'sample-2', name: 'Medical Center', address: '456 Oak Ave', city: 'Los Angeles' }
-        ];
-        setHospitals(sampleHospitals);
-        console.log('Using sample hospitals:', sampleHospitals);
+        setHospitals([]);
       } else {
         setHospitals(result.data);
       }
     } catch (error) {
-      console.error('Error fetching hospitals:', error);
-      alert(`Failed to load hospitals. Please refresh the page.`);
+      console.warn('Hospitals are temporarily unavailable:', error);
+      setHospitals([]);
+      setCatalogError('Could not connect to the hospital service.');
+    } finally {
+      setCatalogLoading(false);
     }
   };
 
   const fetchDepartments = async (hospitalId: string) => {
     try {
-      const response = await fetch(`/api/departments?hospitalId=${hospitalId}`);
+      const response = await fetch(`/backend-api/departments?hospitalId=${hospitalId}`);
       const result = await response.json();
       
       if (!response.ok) {
         console.error('Error fetching departments:', result.error);
-        // Use sample departments as fallback
-        const sampleDepartments = [
-          { id: 'dept-1', name: 'General Medicine', hospital_id: hospitalId },
-          { id: 'dept-2', name: 'Emergency', hospital_id: hospitalId },
-          { id: 'dept-3', name: 'Cardiology', hospital_id: hospitalId },
-          { id: 'dept-4', name: 'Pediatrics', hospital_id: hospitalId }
-        ];
-        setDepartments(sampleDepartments);
-        console.log('Using sample departments:', sampleDepartments);
+        setDepartments([]);
         return;
       }
       
       if (!result.data || result.data.length === 0) {
-        // Use sample departments if none exist
-        const sampleDepartments = [
-          { id: 'dept-1', name: 'General Medicine', hospital_id: hospitalId },
-          { id: 'dept-2', name: 'Emergency', hospital_id: hospitalId },
-          { id: 'dept-3', name: 'Cardiology', hospital_id: hospitalId },
-          { id: 'dept-4', name: 'Pediatrics', hospital_id: hospitalId }
-        ];
-        setDepartments(sampleDepartments);
-        console.log('Using sample departments:', sampleDepartments);
+        setDepartments([]);
       } else {
         setDepartments(result.data);
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
-      // Use sample departments as fallback
-      const sampleDepartments = [
-        { id: 'dept-1', name: 'General Medicine', hospital_id: hospitalId },
-        { id: 'dept-2', name: 'Emergency', hospital_id: hospitalId },
-        { id: 'dept-3', name: 'Cardiology', hospital_id: hospitalId },
-        { id: 'dept-4', name: 'Pediatrics', hospital_id: hospitalId }
-      ];
-      setDepartments(sampleDepartments);
+      setDepartments([]);
     }
   };
 
@@ -357,7 +317,7 @@ export default function BookAppointmentPage() {
     try {
       console.log('Fetching doctors for department:', departmentId);
       
-      const response = await fetch(`/api/doctors?departmentId=${departmentId}`);
+      const response = await fetch(`/backend-api/doctors?departmentId=${departmentId}`);
       const result = await response.json();
       
       console.log('Doctors API response:', {
@@ -368,54 +328,27 @@ export default function BookAppointmentPage() {
       
       if (!response.ok) {
         console.error('Error fetching doctors:', result.error);
-        // Use sample doctors as fallback
-        const sampleDoctors = [
-          { id: 'doc-1', name: 'Dr. John Smith', department_id: departmentId, rating: 4.8, is_on_leave: false },
-          { id: 'doc-2', name: 'Dr. Sarah Johnson', department_id: departmentId, rating: 4.9, is_on_leave: false },
-          { id: 'doc-3', name: 'Dr. Michael Brown', department_id: departmentId, rating: 4.7, is_on_leave: false }
-        ];
-        setDoctors(sampleDoctors);
-        console.log('Using sample doctors:', sampleDoctors);
+        setDoctors([]);
         return;
       }
       
       if (!result.data || result.data.length === 0) {
-        // Use sample doctors if none exist
-        const sampleDoctors = [
-          { id: 'doc-1', name: 'Dr. John Smith', department_id: departmentId, rating: 4.8, is_on_leave: false },
-          { id: 'doc-2', name: 'Dr. Sarah Johnson', department_id: departmentId, rating: 4.9, is_on_leave: false },
-          { id: 'doc-3', name: 'Dr. Michael Brown', department_id: departmentId, rating: 4.7, is_on_leave: false }
-        ];
-        setDoctors(sampleDoctors);
-        console.log('Using sample doctors:', sampleDoctors);
+        setDoctors([]);
       } else {
         setDoctors(result.data);
       }
     } catch (error) {
       console.error('Error fetching doctors:', error);
-      // Use sample doctors as fallback
-      const sampleDoctors = [
-        { id: 'doc-1', name: 'Dr. John Smith', department_id: departmentId, rating: 4.8, is_on_leave: false },
-        { id: 'doc-2', name: 'Dr. Sarah Johnson', department_id: departmentId, rating: 4.9, is_on_leave: false },
-        { id: 'doc-3', name: 'Dr. Michael Brown', department_id: departmentId, rating: 4.7, is_on_leave: false }
-      ];
-      setDoctors(sampleDoctors);
+      setDoctors([]);
     }
   };
 
   const fetchBookedSlots = async () => {
     try {
-      const { data, error } = await supabase
-        .from('appointments')
-        .select('time_slot')
-        .eq('doctor_id', selectedDoctor)
-        .eq('date', appointmentDate)
-        .neq('status', 'cancelled');
-      
-      if (error) throw error;
-      
-      const slots = data?.map(appointment => appointment.time_slot) || [];
-      setBookedSlots(slots);
+      const response = await fetch(`/backend-api/appointments/booked-slots?doctorId=${encodeURIComponent(selectedDoctor)}&date=${encodeURIComponent(appointmentDate)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to load booked slots');
+      setBookedSlots(result.data || []);
     } catch (error) {
       console.error('Error fetching booked slots:', error);
       setBookedSlots([]);
@@ -426,7 +359,7 @@ export default function BookAppointmentPage() {
     setLoading(true);
     setOtpError(null);
     try {
-      const response = await fetch('/api/send-otp', {
+      const response = await fetch('/backend-api/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -463,7 +396,7 @@ export default function BookAppointmentPage() {
     setLoading(true);
     setOtpError(null);
     try {
-      const response = await fetch('/api/verify-otp', {
+      const response = await fetch('/backend-api/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -528,7 +461,7 @@ export default function BookAppointmentPage() {
     setLoading(true);
     try {
       // First, ensure user exists in the database using server-side API
-      const userResponse = await fetch('/api/ensure-user', {
+      const userResponse = await fetch('/backend-api/ensure-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -544,67 +477,28 @@ export default function BookAppointmentPage() {
         throw new Error(errorData.error || 'Failed to create user');
       }
       
-      // Get hospital, department, and doctor details for notifications
-      const [hospitalData, departmentData, doctorData] = await Promise.all([
-        supabase.from('hospitals').select('name').eq('id', selectedHospital).single(),
-        supabase.from('departments').select('name').eq('id', selectedDepartment).single(),
-        supabase.from('doctors').select('name').eq('id', selectedDoctor).single()
-      ]);
-
-      const doctorName = doctorData.data?.name || 'Doctor';
-      const hospitalName = hospitalData.data?.name || 'Hospital';
-      const departmentName = departmentData.data?.name || 'Department';
-      const formattedDateIso = appointmentDate.includes('T') ? appointmentDate : `${appointmentDate}T00:00:00.000Z`;
-
-      const { data, error } = await supabase
-        .from('appointments')
-        .insert({
-          patient_id: user.id,
-          patient_name: formData.name,
-          hospital_id: selectedHospital,
-          hospital_name: hospitalName,
-          department_id: selectedDepartment,
-          department_name: departmentName,
-          doctor_id: selectedDoctor,
-          doctor_name: doctorName,
-          date: formattedDateIso,
-          time_slot: timeSlot,
-          status: 'confirmed',
-          otp_verified: true
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-
-      // If appointment is for TODAY, also register them in the live queue for the doctor
-      const todayString = new Date().toISOString().split('T')[0];
-      if (appointmentDate === todayString) {
-        try {
-          const tokenNum = Math.floor(100000 + Math.random() * 900000);
-          await supabase.from('queue').insert({
-            token_number: tokenNum,
-            patient_id: user.id,
-            patient_name: formData.name,
-            hospital_id: selectedHospital,
-            department_id: selectedDepartment,
-            doctor_id: selectedDoctor,
-            date: new Date().toISOString(),
-            time: new Date().toISOString(),
-            treatment_type: 'Scheduled Consultation',
-            is_emergency: false,
-            status: 'waiting',
-            position: 1,
-            estimated_wait_time: 15
-          });
-        } catch (qErr) {
-          console.warn('Auto live queue insert warning:', qErr);
-        }
-      }
+      const bookingResponse = await fetch('/backend-api/appointments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patientName: formData.name,
+          hospitalId: selectedHospital,
+          departmentId: selectedDepartment,
+          doctorId: selectedDoctor,
+          date: appointmentDate,
+          timeSlot,
+        }),
+      });
+      const bookingResult = await bookingResponse.json();
+      if (!bookingResponse.ok) throw new Error(bookingResult.error || 'Failed to book appointment');
+      const data = bookingResult.data;
+      const doctorName = data.doctor_name || doctors.find(d => d.id === selectedDoctor)?.name || 'Doctor';
+      const hospitalName = data.hospital_name || hospitals.find(h => h.id === selectedHospital)?.name || 'Hospital';
+      const departmentName = data.department_name || departments.find(d => d.id === selectedDepartment)?.name || 'Department';
 
       // Send confirmation email via email service
       try {
-        await fetch('/api/appointments/send-confirmation', {
+        await fetch('/backend-api/appointments/send-confirmation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -624,41 +518,6 @@ export default function BookAppointmentPage() {
         console.warn('Confirmation email dispatch warning:', mailErr);
       }
 
-      // Send notification to admin about new appointment
-      await notificationService.createNotification(
-        'appointment',
-        '📅 New Appointment Booked',
-        `${formData.name} has booked an appointment with Dr. ${doctorName} at ${hospitalName} on ${appointmentDate} at ${timeSlot}`,
-        {
-          appointmentId: data.id,
-          patientName: formData.name,
-          doctorName,
-          hospitalName,
-          departmentName,
-          date: appointmentDate,
-          time: timeSlot
-        }
-      );
-
-      // Send notification to the specific doctor
-      if (doctorData.data?.name) {
-        await notificationService.createNotification(
-          'appointment',
-          `📅 New Appointment - ${appointmentDate}`,
-          `You have a new appointment with ${formData.name} on ${appointmentDate} at ${timeSlot} at ${hospitalName}`,
-          {
-            appointmentId: data.id,
-            patientName: formData.name,
-            doctorName,
-            hospitalName,
-            departmentName,
-            date: appointmentDate,
-            time: timeSlot,
-            targetDoctorId: selectedDoctor
-          }
-        );
-      }
-      
       // Set confirmation data and show popup
       setConfirmationData({
         appointmentId: data.id,
@@ -755,6 +614,19 @@ export default function BookAppointmentPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {catalogError && (
+              <div className="mx-2 mt-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold">Appointment service unavailable</p>
+                  <p className="mt-1 text-sm">{catalogError}</p>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={fetchHospitals}>
+                  Retry
+                </Button>
+              </div>
+            )}
+
             {/* Existing Appointments Section */}
             {userAppointments.length > 0 && (
               <div className="mb-8">
@@ -768,7 +640,7 @@ export default function BookAppointmentPage() {
                             {new Date(appointment.date).toLocaleDateString()} at {appointment.time_slot}
                           </div>
                           <div className="text-sm text-gray-600 mt-1">
-                            {appointment.doctor_name ? `Dr. ${appointment.doctor_name}` : 'Doctor'} • {appointment.hospital_name || 'Hospital'}
+                            {formatDoctorName(appointment.doctor_name)} • {appointment.hospital_name || 'Hospital'}
                           </div>
                           <div className="text-sm text-gray-500 mt-1">
                             Status: <span className={`font-medium ${
@@ -824,7 +696,9 @@ export default function BookAppointmentPage() {
                     >
                       <option value="">Choose a hospital...</option>
                       {hospitals.length === 0 ? (
-                        <option value="" disabled>Loading hospitals...</option>
+                        <option value="" disabled>
+                          {catalogLoading ? 'Loading hospitals...' : 'No hospitals available'}
+                        </option>
                       ) : (
                         hospitals.map((hospital) => (
                           <option key={hospital.id} value={hospital.id}>
@@ -1278,7 +1152,7 @@ export default function BookAppointmentPage() {
                   </div>
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-gray-600">Doctor:</span>
-                    <span className="font-medium">Dr. {confirmationData.doctorName}</span>
+                    <span className="font-medium">{formatDoctorName(confirmationData.doctorName)}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b">
                     <span className="text-gray-600">Hospital:</span>

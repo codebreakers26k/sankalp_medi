@@ -1,0 +1,46 @@
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /api
+  error:
+    include-message: never
+
+spring:
+  config:
+    import: optional:file:../.env[.properties],optional:file:.env[.properties]
+  application:
+    name: mediqueue-backend
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/mediqueue}
+    username: ${DATABASE_USERNAME:postgres}
+    password: ${DATABASE_PASSWORD:}
+    hikari:
+      maximum-pool-size: ${DATABASE_POOL_SIZE:10}
+      minimum-idle: 1
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    baseline-on-migrate: true
+    baseline-version: 0
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${CLERK_ISSUER_URI:https://example.invalid}
+  mail:
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASS:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+app:
+  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:3000}
+  expose-development-otp: ${EXPOSE_DEVELOPMENT_OTP:false}
+  mail-from: ${SMTP_FROM:${SMTP_USER:}}
+  mail-from-name: ${SMTP_FROM_NAME:MediQueue Pro}
+  gemini-api-key: ${GEMINI_API_KEY:}
+  clerk-secret-key: ${CLERK_SECRET_KEY:}
+  supabase-url: ${SUPABASE_URL:${NEXT_PUBLIC_SUPABASE_URL:}}
+  supabase-service-role-key: ${SUPABASE_SECRET_KEY:${SUPABASE_SERVICE_ROLE_KEY:}}

@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Add any config options here if needed
+  // Keep generated AI-agent instructions out of the application repository.
+  agentRules: false,
 };
 
 export default nextConfig;

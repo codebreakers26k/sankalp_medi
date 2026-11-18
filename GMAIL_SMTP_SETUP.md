@@ -25,7 +25,7 @@
    - **IMPORTANT:** Copy the 16-character password shown (you won't see it again!)
 
 3. **Configure Environment Variables**
-   - Create or update `.env.local` file in your project root
+   - Update the single `.env` file in your project root
    - Add the following variables:
 
 ```env
@@ -34,7 +34,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-16-character-app-password
+SMTP_PASS=<gmail-app-password>
 SMTP_FROM_NAME=Queue Management System
 ```
 
@@ -50,7 +50,7 @@ This is more secure but complex. For most use cases, App Password is sufficient.
 | `SMTP_PORT` | Port number (587 for TLS, 465 for SSL) | `587` |
 | `SMTP_SECURE` | Use SSL (true for port 465, false for 587) | `false` |
 | `SMTP_USER` | Your Gmail address | `yourname@gmail.com` |
-| `SMTP_PASS` | App password (16 characters, no spaces) | `abcd efgh ijkl mnop` |
+| `SMTP_PASS` | Google-generated app password | `<gmail-app-password>` |
 | `SMTP_FROM_NAME` | Sender name in emails | `Queue Management System` |
 
 ## Testing Your Configuration
@@ -86,7 +86,7 @@ After setting up the environment variables:
 
 ## Security Best Practices
 
-1. **Never commit `.env.local` to Git**
+1. **Never commit `.env` to Git**
    - It's already in `.gitignore`
    - Double-check before pushing code
 
@@ -114,19 +114,19 @@ These services offer better deliverability and analytics.
 
 - [ ] Enable 2-Step Verification on Gmail
 - [ ] Generate App Password
-- [ ] Create `.env.local` file
+- [ ] Update the root `.env` file
 - [ ] Add all SMTP variables
 - [ ] Copy App Password (16 characters)
 - [ ] Restart development server
 - [ ] Test by booking an appointment
 - [ ] Check email inbox (and spam folder)
 
-## Example `.env.local` File
+## Root `.env` values
 
 ```env
 # Clerk Authentication (existing)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
+CLERK_SECRET_KEY=<clerk-secret-key>
 
 # Supabase (existing)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -137,7 +137,7 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=yourname@gmail.com
-SMTP_PASS=abcd efgh ijkl mnop
+SMTP_PASS=<gmail-app-password>
 SMTP_FROM_NAME=Queue Management System
 ```
 

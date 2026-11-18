@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { GlassCalendar } from "@/components/ui/glass-calendar";
-import { supabase } from "@/lib/supabase/client";
 import { DoctorNav } from "@/components/doctor/DoctorNav";
 
 interface CalendarAppointment {
@@ -66,23 +65,12 @@ export default function DoctorCalendarPage() {
   const fetchAppointmentsForDate = async (date: Date) => {
     try {
       const dateStr = format(date, "yyyy-MM-dd");
-      const { data: doctor } = await supabase
-        .from("doctors")
-        .select("id")
-        .eq("email", user?.primaryEmailAddress?.emailAddress)
-        .maybeSingle();
-
-      const docId = doctor?.id || user?.id;
-
-      const { data } = await supabase
-        .from("appointments")
-        .select("*")
-        .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-        .gte("date", `${dateStr}T00:00:00.000Z`)
-        .lte("date", `${dateStr}T23:59:59.999Z`)
-        .order("time_slot");
-
-      setAppointments(data || []);
+      const response = await fetch("/backend-api/doctor/workspace", { cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const { data } = await response.json();
+      setAppointments((data.allAppointments || []).filter((appointment: any) =>
+        appointment.date?.split("T")[0] === dateStr
+      ));
     } catch (err) {
       console.error("Error fetching appointments for date:", err);
     }

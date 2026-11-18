@@ -5,7 +5,6 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BarChart3, Users, Clock, CheckCircle2, RefreshCw, LogOut } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 import { DoctorNav } from "@/components/doctor/DoctorNav";
 
 type AnalyticsFilter = "yesterday" | "day_before" | "last_7_days" | "custom";
@@ -43,13 +42,6 @@ export default function DoctorAnalyticsPage() {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      const { data: doctor } = await supabase
-        .from("doctors")
-        .select("id")
-        .eq("email", user?.primaryEmailAddress?.emailAddress)
-        .maybeSingle();
-
-      const docId = doctor?.id || user?.id;
       const today = new Date();
       let fromDate = "";
       let toDate = today.toISOString().split("T")[0];
@@ -76,26 +68,19 @@ export default function DoctorAnalyticsPage() {
         return;
       }
 
-      const [qRes, aRes] = await Promise.all([
-        supabase
-          .from("queue")
-          .select("*", { count: "exact", head: true })
-          .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-          .eq("status", "completed")
-          .gte("created_at", fromDate)
-          .lte("created_at", toDate + "T23:59:59"),
-        supabase
-          .from("appointments")
-          .select("*", { count: "exact", head: true })
-          .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-          .eq("status", "completed")
-          .gte("date", `${fromDate}T00:00:00.000Z`)
-          .lte("date", `${toDate}T23:59:59.999Z`),
-      ]);
+      const response = await fetch("/backend-api/doctor/workspace", { cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const { data: workspace } = await response.json();
+      const inRange = (value?: string) => {
+        const day = value?.split("T")[0] || "";
+        return day >= fromDate && day <= toDate;
+      };
 
       setData({
-        patientsServed: qRes.count || 0,
-        completedAppointments: aRes.count || 0,
+        patientsServed: (workspace.history || []).filter((item: any) => inRange(item.updated_at || item.created_at)).length,
+        completedAppointments: (workspace.allAppointments || []).filter(
+          (item: any) => item.status === "completed" && inRange(item.date)
+        ).length,
       });
     } catch (err) {
       console.error("Error fetching analytics:", err);

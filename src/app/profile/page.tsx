@@ -13,6 +13,7 @@ export default function ProfilePage() {
   const { user, isLoaded, isSignedIn } = useUser();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
@@ -31,14 +32,38 @@ export default function ProfilePage() {
         mobile: user.phoneNumbers?.[0]?.phoneNumber || "",
         patientId: `PAT${user.id.slice(-8).toUpperCase()}`,
       });
+      fetch("/backend-api/users/me", { cache: "no-store" })
+        .then(async (response) => response.ok ? response.json() : null)
+        .then((result) => {
+          if (!result?.data) return;
+          setProfileData({
+            name: result.data.name || user.fullName || "",
+            email: result.data.email || user.primaryEmailAddress?.emailAddress || "",
+            mobile: result.data.mobile || "",
+            patientId: result.data.patient_id || `PAT${user.id.slice(-8).toUpperCase()}`,
+          });
+        })
+        .catch((error) => console.error("Could not load profile:", error));
     }
   }, [isLoaded, isSignedIn, user, router]);
 
-  const handleSave = () => {
-    // TODO: Save profile data to Supabase
-    console.log("Saving profile:", profileData);
-    setIsEditing(false);
-    alert("Profile update will be available once the database is set up!");
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch("/backend-api/users/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: profileData.name, mobile: profileData.mobile }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save profile");
+      setProfileData((current) => ({ ...current, ...result.data, patientId: result.data.patient_id }));
+      setIsEditing(false);
+    } catch (error: any) {
+      alert(error.message || "Could not save profile");
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!isLoaded || !isSignedIn) {
@@ -130,9 +155,9 @@ export default function ProfilePage() {
                       <X className="h-4 w-4 mr-1" />
                       Cancel
                     </Button>
-                    <Button size="sm" onClick={handleSave} className="rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/20">
+                    <Button size="sm" onClick={handleSave} disabled={saving} className="rounded-xl bg-blue-600 hover:bg-blue-700 shadow-sm shadow-blue-500/20">
                       <Save className="h-4 w-4 mr-1" />
-                      Save
+                      {saving ? "Saving..." : "Save"}
                     </Button>
                   </div>
                 )}

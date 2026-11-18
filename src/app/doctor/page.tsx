@@ -23,7 +23,6 @@ import {
   BadgeCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase/client";
 
 // ── KokonutUI Components ──────────────────────────────────────────────────────
 import CardFlip, { QR_SIZE, buildQrPath } from "@/components/kokonutui/card-flip";
@@ -272,50 +271,15 @@ export default function DoctorLandingPage() {
 
   const fetchDoctorSummary = async () => {
     try {
-      const { data: doctor } = await supabase
-        .from("doctors")
-        .select("*")
-        .eq("email", user?.primaryEmailAddress?.emailAddress)
-        .maybeSingle();
-
-      const docId = doctor?.id || user?.id;
-      setDoctorInfo(
-        doctor || {
-          id: docId,
-          name: user?.fullName || "Dr. Marcus Vance",
-          email: user?.primaryEmailAddress?.emailAddress,
-          specialization: "Cardiology & Internal Medicine",
-          qualification: "MBBS, MD (Harvard), FACS",
-          experience: 15,
-        }
-      );
-
-      const today = new Date().toISOString().split("T")[0];
-
-      const [qRes, aRes, hRes] = await Promise.all([
-        supabase
-          .from("queue")
-          .select("*", { count: "exact", head: true })
-          .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-          .eq("status", "waiting"),
-        supabase
-          .from("appointments")
-          .select("*", { count: "exact", head: true })
-          .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-          .gte("date", `${today}T00:00:00.000Z`)
-          .lte("date", `${today}T23:59:59.999Z`),
-        supabase
-          .from("queue")
-          .select("*", { count: "exact", head: true })
-          .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-          .eq("status", "completed")
-          .gte("created_at", today),
-      ]);
+      const response = await fetch("/backend-api/doctor/workspace", { cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const { data } = await response.json();
+      setDoctorInfo(data.doctor);
 
       setStats({
-        waitingQueue: qRes.count || 0,
-        todayAppointments: aRes.count || 0,
-        patientsServed: hRes.count || 0,
+        waitingQueue: data.metrics?.waiting || 0,
+        todayAppointments: data.appointments?.length || 0,
+        patientsServed: data.metrics?.completedToday || 0,
       });
     } catch (err) {
       console.error("Error loading doctor summary:", err);

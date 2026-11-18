@@ -27,7 +27,7 @@ import {
   motion,
   Reorder,
   useDragControls,
-} from "motion/react";
+} from "framer-motion";
 import {
   type KeyboardEvent,
   useCallback,

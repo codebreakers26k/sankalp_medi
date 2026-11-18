@@ -8,12 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Hospital, Users, ArrowLeft, User as UserIcon, Calendar, Mail, Activity } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { supabase } from "@/lib/supabase/client";
-import { queueService } from "@/lib/services/queueService";
 import { QRCodePopup } from "@/components/QRCodePopup";
 import { EmergencyButton } from "@/components/EmergencyButton";
 import { QueueStatusWidget } from "@/components/QueueStatusWidget";
-import { notificationService } from "@/lib/services/notificationService";
 import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
 export default function JoinQueuePage() {
@@ -77,13 +74,10 @@ export default function JoinQueuePage() {
 
   const fetchHospitals = async () => {
     try {
-      const { data, error } = await supabase
-        .from('hospitals')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      setHospitals(data || []);
+      const response = await fetch('/backend-api/hospitals');
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to load hospitals');
+      setHospitals(result.data || []);
     } catch (error: any) {
       console.error('Error fetching hospitals:', error?.message || error);
     }
@@ -91,14 +85,10 @@ export default function JoinQueuePage() {
 
   const fetchDepartments = async (hospitalId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('*')
-        .eq('hospital_id', hospitalId)
-        .order('name');
-
-      if (error) throw error;
-      setDepartments(data || []);
+      const response = await fetch(`/backend-api/departments?hospitalId=${encodeURIComponent(hospitalId)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to load departments');
+      setDepartments(result.data || []);
     } catch (error: any) {
       console.error('Error fetching departments:', error?.message || error);
     }
@@ -106,16 +96,10 @@ export default function JoinQueuePage() {
 
   const fetchDoctors = async (hospitalId: string, departmentId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('doctors')
-        .select('*')
-        .eq('hospital_id', hospitalId)
-        .eq('department_id', departmentId)
-        .eq('is_on_leave', false)
-        .order('rating', { ascending: false });
-
-      if (error) throw error;
-      setDoctors(data || []);
+      const response = await fetch(`/backend-api/doctors?hospitalId=${encodeURIComponent(hospitalId)}&departmentId=${encodeURIComponent(departmentId)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to load doctors');
+      setDoctors(result.data || []);
     } catch (error: any) {
       console.error('Error fetching doctors:', error?.message || error);
     }
@@ -123,27 +107,10 @@ export default function JoinQueuePage() {
 
   const calculateWaitTime = async (departmentId: string): Promise<number> => {
     try {
-      // Get current queue position and average treatment time
-      const { data: queueData } = await supabase
-        .from('queue')
-        .select('position, created_at')
-        .eq('department_id', departmentId)
-        .eq('status', 'waiting')
-        .order('position', { ascending: true });
-
-      // Get average treatment time from doctors in this department
-      const { data: doctors } = await supabase
-        .from('doctors')
-        .select('average_treatment_time')
-        .eq('department_id', departmentId);
-
-      const avgTreatmentTime = doctors?.reduce((sum, doc) => sum + (doc.average_treatment_time || 15), 0) || 0 / (doctors?.length || 1);
-      
-      // Calculate wait time based on queue position
-      const queueLength = queueData?.length || 0;
-      const estimatedWaitTime = queueLength * (avgTreatmentTime || 15);
-      
-      return estimatedWaitTime;
+      const response = await fetch(`/backend-api/queue/status?departmentId=${encodeURIComponent(departmentId)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to load queue status');
+      return Math.round(result.data?.metrics?.averageWaitTime || 0);
     } catch (error) {
       console.error('Error calculating wait time:', error);
       return 30; // Default 30 minutes
@@ -159,7 +126,7 @@ export default function JoinQueuePage() {
     try {
       // First, ensure user exists in the database using server-side API
       const patientId = `PAT${Date.now().toString().slice(-6)}`;
-      const userResponse = await fetch('/api/ensure-user', {
+      const userResponse = await fetch('/backend-api/ensure-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,61 +145,33 @@ export default function JoinQueuePage() {
         throw new Error(errorData.error || 'Failed to create user');
       }
       
-      const doctorId = selectedDoctor || null;
-      
-      // Calculate wait time
-      const estimatedWaitTime = await calculateWaitTime(selectedDepartment);
-      
-      // Get hospital and department names
-      const { data: hospitalData } = await supabase
-        .from('hospitals')
-        .select('name')
-        .eq('id', selectedHospital)
-        .single();
-      
-      const { data: departmentData } = await supabase
-        .from('departments')
-        .select('name')
-        .eq('id', selectedDepartment)
-        .single();
-      
-      const { data: doctorData } = await supabase
-        .from('doctors')
-        .select('name')
-        .eq('id', doctorId)
-        .single();
-      
-      // Add to queue using the queue service
-      const queueEntry = await queueService.addToQueue({
-        patientId: user.id,
+      const queueResponse = await fetch('/backend-api/queue/join', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
         patientName: formData.name,
         hospitalId: selectedHospital,
         departmentId: selectedDepartment,
-        doctorId: doctorId || '',
-        date: new Date(),
-        time: new Date(),
+        doctorId: selectedDoctor || null,
         treatmentType: 'General Consultation',
-        isEmergency: false,
-        status: 'waiting',
+        }),
       });
-      
-      // Send notification to admin
-      await notificationService.notifyPatientAdded(
-        formData.name,
-        hospitalData?.name || 'Unknown Hospital',
-        departmentData?.name || 'Unknown Department',
-        queueEntry.tokenNumber
-      );
+      const queueResult = await queueResponse.json();
+      if (!queueResponse.ok) throw new Error(queueResult.error || 'Failed to join queue');
+      const queueEntry = queueResult.data;
+      const hospitalData = hospitals.find(h => h.id === selectedHospital);
+      const departmentData = departments.find(d => d.id === selectedDepartment);
+      const doctorData = doctors.find(d => d.id === selectedDoctor);
 
       // Show QR popup
       setQrData({
-        qrCode: queueEntry.qrCode,
-        tokenNumber: queueEntry.tokenNumber,
+        qrCode: queueEntry.qr_code,
+        tokenNumber: queueEntry.token_number,
         patientName: formData.name,
         hospitalName: hospitalData?.name || 'Unknown Hospital',
         departmentName: departmentData?.name || 'Unknown Department',
         doctorName: doctorData?.name || 'Available Doctor',
-        estimatedWaitTime,
+        estimatedWaitTime: queueEntry.estimated_wait_time || 0,
         position: queueEntry.position || 1,
         isEmergency: false
       });

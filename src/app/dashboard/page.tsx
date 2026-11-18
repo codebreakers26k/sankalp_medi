@@ -5,9 +5,8 @@ import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, Calendar, Clock, Activity, ArrowLeft, ArrowRight, Zap, Target, CheckCircle, XCircle, RefreshCw } from "lucide-react";
+import { Users, Calendar, Clock, Activity, ArrowLeft, ArrowRight, Zap, Target, CheckCircle, XCircle, RefreshCw, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 import { PatientNotification } from "@/components/PatientNotification";
 import { motion, AnimatePresence } from "framer-motion";
 import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
@@ -42,6 +41,7 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [appointments, setAppointments] = useState<AppointmentItem[]>([]);
   const [activityLoading, setActivityLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
   const [rescheduleModal, setRescheduleModal] = useState<{ open: boolean; appointmentId: string; newDate: string; newTime: string }>({
     open: false, appointmentId: "", newDate: "", newTime: ""
   });
@@ -66,48 +66,45 @@ export default function DashboardPage() {
   useEffect(() => {
     if (isLoaded && isSignedIn && user) {
       fetchAll();
-      // Real-time subscriptions
-      const queueSub = supabase.channel("dashboard-queue")
-        .on("postgres_changes", { event: "*", schema: "public", table: "queue" }, () => fetchAll())
-        .subscribe();
-      const apptSub = supabase.channel("dashboard-appt")
-        .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, () => fetchAll())
-        .subscribe();
-      return () => { queueSub.unsubscribe(); apptSub.unsubscribe(); };
+      const interval = window.setInterval(fetchAll, 15_000);
+      return () => window.clearInterval(interval);
     }
   }, [isLoaded, isSignedIn, user]);
 
   const fetchAll = async () => {
     if (!user) return;
     setActivityLoading(true);
+    setDashboardError(null);
     try {
       const today = new Date().toISOString().split("T")[0];
 
-      const [queueRes, apptRes] = await Promise.all([
-        supabase.from("queue").select("*").eq("patient_id", user.id).order("created_at", { ascending: false }),
-        supabase.from("appointments").select("*").eq("patient_id", user.id).order("created_at", { ascending: false }),
-      ]);
-
-      const queueData = queueRes.data || [];
-      const apptData = apptRes.data || [];
+      const response = await fetch("/backend-api/users/me/dashboard", { cache: "no-store" });
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        setDashboardError(result?.error || "Dashboard data is temporarily unavailable.");
+        return;
+      }
+      const { data } = await response.json();
+      const queueData = data.queue || [];
+      const apptData = data.appointments || [];
 
       // Stats
       setStats({
-        activeQueues: queueData.filter(q => q.status === "waiting" || q.status === "in-treatment").length,
-        upcomingAppointments: apptData.filter(a => (a.status === "confirmed" || a.status === "pending") && a.date >= today).length,
-        completedVisits: queueData.filter(q => q.status === "completed").length,
+        activeQueues: queueData.filter((q: any) => q.status === "waiting" || q.status === "in-treatment").length,
+        upcomingAppointments: apptData.filter((a: any) => (a.status === "confirmed" || a.status === "pending") && a.date >= today).length,
+        completedVisits: queueData.filter((q: any) => q.status === "completed").length,
       });
 
       // Recent activity items (combined + sorted)
       const actItems: ActivityItem[] = [];
-      queueData.forEach(q => {
+      queueData.forEach((q: any) => {
         let type: ActivityItem["type"] = "queue_active";
         let label = "Joined Queue";
         if (q.status === "completed") { type = "queue_completed"; label = "Visit Completed"; }
         else if (q.status === "cancelled") { type = "queue_cancelled"; label = "Queue Cancelled"; }
         actItems.push({ id: q.id, type, label, detail: `Token #${q.token_number} — ${q.treatment_type || "Consultation"}`, time: new Date(q.created_at).toLocaleString(), raw_time: q.created_at });
       });
-      apptData.forEach(a => {
+      apptData.forEach((a: any) => {
         let type: ActivityItem["type"] = "appointment_booked";
         let label = "Appointment Booked";
         if (a.status === "cancelled") { type = "appointment_cancelled"; label = "Appointment Cancelled"; }
@@ -117,18 +114,16 @@ export default function DashboardPage() {
       actItems.sort((a, b) => new Date(b.raw_time).getTime() - new Date(a.raw_time).getTime());
       setActivity(actItems.slice(0, 15));
 
-      // Appointments with names
-      const enriched = await Promise.all(apptData.filter(a => a.status !== "cancelled").slice(0, 10).map(async (a) => {
-        const [hospRes, deptRes, docRes] = await Promise.all([
-          supabase.from("hospitals").select("name").eq("id", a.hospital_id).single(),
-          supabase.from("departments").select("name").eq("id", a.department_id).single(),
-          supabase.from("doctors").select("name").eq("id", a.doctor_id).single(),
-        ]);
-        return { ...a, hospitalName: hospRes.data?.name, departmentName: deptRes.data?.name, doctorName: docRes.data?.name };
+      const enriched = apptData.filter((a: any) => a.status !== "cancelled").slice(0, 10).map((a: any) => ({
+        ...a,
+        hospitalName: a.resolved_hospital_name || a.hospital_name,
+        departmentName: a.resolved_department_name || a.department_name,
+        doctorName: a.resolved_doctor_name || a.doctor_name,
       }));
       setAppointments(enriched);
     } catch (err) {
-      console.error("Error fetching dashboard data:", err);
+      console.warn("Dashboard data is temporarily unavailable:", err);
+      setDashboardError("Could not connect to the dashboard service.");
     } finally {
       setActivityLoading(false);
     }
@@ -136,7 +131,7 @@ export default function DashboardPage() {
 
   const cancelAppointment = async (appointmentId: string) => {
     try {
-      const res = await fetch("/api/appointments/cancel", {
+      const res = await fetch("/backend-api/appointments/cancel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId }),
@@ -149,7 +144,7 @@ export default function DashboardPage() {
   const rescheduleAppointment = async () => {
     if (!rescheduleModal.newDate || !rescheduleModal.newTime) { alert("Please select a new date and time."); return; }
     try {
-      const res = await fetch("/api/appointments/reschedule", {
+      const res = await fetch("/backend-api/appointments/reschedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ appointmentId: rescheduleModal.appointmentId, newDate: rescheduleModal.newDate, newTimeSlot: rescheduleModal.newTime }),
@@ -210,6 +205,17 @@ export default function DashboardPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {dashboardError && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold">Dashboard service unavailable</p>
+              <p className="mt-1 text-sm">{dashboardError}</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={fetchAll}>Retry</Button>
+          </div>
+        )}
+
         <div className="mb-10">
           <h2 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">Welcome back, {user.firstName || user.fullName}!</h2>
           <p className="text-slate-500 dark:text-zinc-400 text-lg">Here's your queue and appointment overview</p>

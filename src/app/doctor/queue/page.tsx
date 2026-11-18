@@ -21,7 +21,6 @@ import {
   UserCheck,
   Plus,
 } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 import { DoctorNav } from "@/components/doctor/DoctorNav";
 
 interface QueuePatient {
@@ -81,69 +80,18 @@ export default function DoctorQueuePage() {
 
   useEffect(() => {
     if (!doctorInfo) return;
-    const subQueue = supabase
-      .channel("doctor-queue-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "queue" }, () =>
-        fetchQueueData()
-      )
-      .subscribe();
-
-    const subAppts = supabase
-      .channel("doctor-appts-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "appointments" }, () =>
-        fetchQueueData()
-      )
-      .subscribe();
-
-    return () => {
-      subQueue.unsubscribe();
-      subAppts.unsubscribe();
-    };
+    const interval = window.setInterval(fetchQueueData, 15_000);
+    return () => window.clearInterval(interval);
   }, [doctorInfo]);
 
   const fetchQueueData = async () => {
     try {
-      const email = user?.primaryEmailAddress?.emailAddress;
-      const { data: doctor } = await supabase
-        .from("doctors")
-        .select("*")
-        .eq("email", email)
-        .maybeSingle();
-
-      const docId = doctor?.id || user?.id;
-      setDoctorInfo(
-        doctor || {
-          id: docId,
-          name: user?.fullName || "Doctor",
-          email,
-          specialization: "Cardiology",
-          average_treatment_time: 15,
-        }
-      );
-
-      // Query live queue for this doctor
-      const { data: queueData } = await supabase
-        .from("queue")
-        .select("*")
-        .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-        .eq("status", "waiting")
-        .order("is_emergency", { ascending: false })
-        .order("position", { ascending: true });
-
-      setQueue(queueData || []);
-
-      // Query today's scheduled appointments for this doctor
-      const today = new Date().toISOString().split("T")[0];
-      const { data: apptData } = await supabase
-        .from("appointments")
-        .select("*")
-        .or(`doctor_id.eq.${docId},doctor_id.eq.${user?.id}`)
-        .gte("date", `${today}T00:00:00.000Z`)
-        .lte("date", `${today}T23:59:59.999Z`)
-        .neq("status", "cancelled")
-        .order("time_slot", { ascending: true });
-
-      setAppointments(apptData || []);
+      const response = await fetch("/backend-api/doctor/workspace", { cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const { data: workspace } = await response.json();
+      setDoctorInfo(workspace.doctor);
+      setQueue(workspace.queue || []);
+      setAppointments(workspace.appointments || []);
     } catch (err) {
       console.error("Error fetching queue & appointments:", err);
     } finally {
@@ -156,20 +104,13 @@ export default function DoctorQueuePage() {
     const next = queue[0];
     setActionLoading(true);
     try {
-      await supabase.from("queue").update({ status: "in-treatment" }).eq("id", next.id);
-      await supabase.from("notifications").insert({
-        type: "queue",
-        title: "Your Turn!",
-        message: `Please proceed to Dr. ${doctorInfo?.name || "Doctor"}. Token: ${next.token_number}`,
-        read: false,
-        created_at: new Date().toISOString(),
-        metadata: {
-          patientId: next.patient_id,
-          doctorId: doctorInfo?.id,
-          tokenNumber: next.token_number,
-        },
+      const response = await fetch(`/backend-api/doctor/queue/${next.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "in-treatment" }),
       });
-      fetchQueueData();
+      if (!response.ok) throw new Error(await response.text());
+      await fetchQueueData();
     } catch (error) {
       console.error("Error calling next patient:", error);
     } finally {
@@ -183,11 +124,13 @@ export default function DoctorQueuePage() {
     if (!otherPatient) return;
 
     try {
-      await Promise.all([
-        supabase.from("queue").update({ position: targetPos }).eq("id", patientId),
-        supabase.from("queue").update({ position: currentPos }).eq("id", otherPatient.id),
-      ]);
-      fetchQueueData();
+      const response = await fetch(`/backend-api/doctor/queue/${patientId}/position`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ position: targetPos }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      await fetchQueueData();
     } catch (error) {
       console.error("Error reordering patient:", error);
     }
@@ -195,8 +138,13 @@ export default function DoctorQueuePage() {
 
   const markCompleted = async (patientId: string) => {
     try {
-      await supabase.from("queue").update({ status: "completed" }).eq("id", patientId);
-      fetchQueueData();
+      const response = await fetch(`/backend-api/doctor/queue/${patientId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      await fetchQueueData();
     } catch (error) {
       console.error("Error completing patient:", error);
     }
@@ -205,45 +153,12 @@ export default function DoctorQueuePage() {
   const admitAppointmentToQueue = async (appt: ScheduledAppointment) => {
     setAdmittingId(appt.id);
     try {
-      // Check if already in queue
-      const { data: existingQueue } = await supabase
-        .from("queue")
-        .select("id, token_number")
-        .eq("patient_id", appt.patient_id)
-        .eq("status", "waiting")
-        .maybeSingle();
-
-      if (existingQueue) {
-        alert(`Patient ${appt.patient_name} is already waiting in queue with Token: ${existingQueue.token_number}`);
-        return;
-      }
-
-      const now = new Date();
-      const tokenNumber = Math.floor(100000 + Math.random() * 900000);
-      const position = queue.length + 1;
-
-      const { error: insertErr } = await supabase.from("queue").insert({
-        token_number: tokenNumber,
-        patient_id: appt.patient_id || user?.id,
-        patient_name: appt.patient_name,
-        hospital_id: appt.hospital_id || doctorInfo?.hospital_id,
-        department_id: appt.department_id || doctorInfo?.department_id,
-        doctor_id: appt.doctor_id || doctorInfo?.id,
-        date: now.toISOString(),
-        time: now.toISOString(),
-        treatment_type: "Appointment Consultation",
-        is_emergency: false,
-        status: "waiting",
-        position,
-        estimated_wait_time: position * (doctorInfo?.average_treatment_time || 15),
+      const response = await fetch(`/backend-api/doctor/appointments/${appt.id}/admit`, {
+        method: "POST",
       });
-
-      if (insertErr) throw insertErr;
-
-      // Update appointment status to confirmed
-      await supabase.from("appointments").update({ status: "confirmed" }).eq("id", appt.id);
-
-      alert(`✅ Patient ${appt.patient_name} admitted to Live Queue! Token: ${tokenNumber}`);
+      if (!response.ok) throw new Error(await response.text());
+      const admitted = await response.json();
+      alert(`✅ Patient ${appt.patient_name} admitted to Live Queue! Token: ${admitted.token_number}`);
       await fetchQueueData();
     } catch (err: any) {
       console.error("Error admitting appointment:", err);

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Clock, Activity, AlertTriangle } from "lucide-react";
-import { supabase } from "@/lib/supabase/client";
 
 interface QueueStatusWidgetProps {
   departmentId?: string;
@@ -22,34 +21,19 @@ export function QueueStatusWidget({ departmentId, hospitalId }: QueueStatusWidge
   useEffect(() => {
     const fetchQueueStatus = async () => {
       try {
-        let query = supabase
-          .from('queue')
-          .select('status, estimated_wait_time, is_emergency');
-
-        if (departmentId) {
-          query = query.eq('department_id', departmentId);
-        }
-        if (hospitalId) {
-          query = query.eq('hospital_id', hospitalId);
-        }
-
-        const { data, error } = await query;
-
-        if (error) throw error;
-
-        const waiting = data?.filter(q => q.status === 'waiting') || [];
-        const inTreatment = data?.filter(q => q.status === 'in-treatment') || [];
-        const emergency = data?.filter(q => q.is_emergency) || [];
-
-        const avgWaitTime = waiting.length > 0 
-          ? waiting.reduce((sum, q) => sum + (q.estimated_wait_time || 0), 0) / waiting.length 
-          : 0;
+        const params = new URLSearchParams({ locationId: "default" });
+        if (departmentId) params.set("departmentId", departmentId);
+        if (hospitalId) params.set("hospitalId", hospitalId);
+        const response = await fetch(`/backend-api/queue/status?${params}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(await response.text());
+        const result = await response.json();
+        const metrics = result.data?.metrics || {};
 
         setQueueData({
-          totalWaiting: waiting.length,
-          averageWaitTime: Math.round(avgWaitTime),
-          inTreatment: inTreatment.length,
-          emergencyCount: emergency.length
+          totalWaiting: Number(metrics.queueLength || 0),
+          averageWaitTime: Math.round(Number(metrics.averageWaitTime || 0)),
+          inTreatment: Number(metrics.inTreatment || 0),
+          emergencyCount: Number(metrics.emergencyCount || 0)
         });
       } catch (error) {
         console.error('Error fetching queue status:', error);
@@ -60,23 +44,8 @@ export function QueueStatusWidget({ departmentId, hospitalId }: QueueStatusWidge
 
     fetchQueueStatus();
 
-    // Set up real-time subscription
-    const subscription = supabase
-      .channel('queue-changes')
-      .on('postgres_changes', 
-        { 
-          event: '*', 
-          schema: 'public', 
-          table: 'queue',
-          filter: departmentId ? `department_id=eq.${departmentId}` : undefined
-        }, 
-        () => fetchQueueStatus()
-      )
-      .subscribe();
-
-    return () => {
-      subscription.unsubscribe();
-    };
+    const interval = window.setInterval(fetchQueueStatus, 15_000);
+    return () => window.clearInterval(interval);
   }, [departmentId, hospitalId]);
 
   const formatWaitTime = (minutes: number) => {

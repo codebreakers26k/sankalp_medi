@@ -9,7 +9,7 @@ export default function DebugPage() {
   useEffect(() => {
     const fetchDebugInfo = async () => {
       try {
-        const response = await fetch('/api/debug/env');
+        const response = await fetch('/backend-api/health');
         const data = await response.json();
         setDebugInfo(data);
       } catch (error) {
@@ -37,19 +37,19 @@ export default function DebugPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Environment Debug</h1>
+        <h1 className="text-3xl font-bold mb-8">Backend Health</h1>
         
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Environment Variables</h2>
+          <h2 className="text-xl font-semibold mb-4">Spring Boot Service</h2>
           <pre className="bg-gray-100 p-4 rounded overflow-auto">
-            {JSON.stringify(debugInfo?.environment, null, 2)}
+            {JSON.stringify(debugInfo, null, 2)}
           </pre>
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <h2 className="text-xl font-semibold mb-4">Supabase Test</h2>
+          <h2 className="text-xl font-semibold mb-4">Database Check</h2>
           <pre className="bg-gray-100 p-4 rounded overflow-auto">
-            {JSON.stringify(debugInfo?.supabaseTest, null, 2)}
+            {JSON.stringify(debugInfo?.database, null, 2)}
           </pre>
         </div>
 

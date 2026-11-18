@@ -51,7 +51,7 @@ export default function StaffDashboard() {
   useEffect(() => {
     const fetchStaffData = async () => {
       try {
-        const response = await fetch('/api/queue/status?locationId=default');
+        const response = await fetch('/backend-api/queue/status?locationId=default');
         const data = await response.json();
         
         if (data.success) {
@@ -75,7 +75,7 @@ export default function StaffDashboard() {
     
     setActionLoading('call-next');
     try {
-      const response = await fetch('/api/queue/call-next', {
+      const response = await fetch('/backend-api/queue/call-next', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ counterId: selectedCounter })
@@ -83,7 +83,7 @@ export default function StaffDashboard() {
       
       if (response.ok) {
         // Refresh data
-        const statusResponse = await fetch('/api/queue/status?locationId=default');
+        const statusResponse = await fetch('/backend-api/queue/status?locationId=default');
         const statusData = await statusResponse.json();
         if (statusData.success) {
           setQueue(statusData.data.queue);
@@ -102,7 +102,7 @@ export default function StaffDashboard() {
     
     setActionLoading('skip');
     try {
-      const response = await fetch('/api/queue/skip', {
+      const response = await fetch('/backend-api/queue/skip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ counterId: selectedCounter })
@@ -110,7 +110,7 @@ export default function StaffDashboard() {
       
       if (response.ok) {
         // Refresh data
-        const statusResponse = await fetch('/api/queue/status?locationId=default');
+        const statusResponse = await fetch('/backend-api/queue/status?locationId=default');
         const statusData = await statusResponse.json();
         if (statusData.success) {
           setQueue(statusData.data.queue);
@@ -127,7 +127,7 @@ export default function StaffDashboard() {
   const transferCustomer = async (fromCounterId: string, toCounterId: string) => {
     setActionLoading('transfer');
     try {
-      const response = await fetch('/api/queue/transfer', {
+      const response = await fetch('/backend-api/queue/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fromCounterId, toCounterId })
@@ -135,7 +135,7 @@ export default function StaffDashboard() {
       
       if (response.ok) {
         // Refresh data
-        const statusResponse = await fetch('/api/queue/status?locationId=default');
+        const statusResponse = await fetch('/backend-api/queue/status?locationId=default');
         const statusData = await statusResponse.json();
         if (statusData.success) {
           setQueue(statusData.data.queue);
@@ -151,15 +151,15 @@ export default function StaffDashboard() {
 
   const updateCounterStatus = async (counterId: string, status: 'open' | 'closed' | 'busy') => {
     try {
-      const response = await fetch('/api/queue/counter-status', {
-        method: 'POST',
+      const response = await fetch('/backend-api/queue/counter-status', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ counterId, status })
       });
       
       if (response.ok) {
         // Refresh data
-        const statusResponse = await fetch('/api/queue/status?locationId=default');
+        const statusResponse = await fetch('/backend-api/queue/status?locationId=default');
         const statusData = await statusResponse.json();
         if (statusData.success) {
           setCounters(statusData.data.counters);

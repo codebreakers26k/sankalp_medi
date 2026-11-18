@@ -16,7 +16,7 @@ import {
   motion,
   type Transition,
   useReducedMotion,
-} from "motion/react";
+} from "framer-motion";
 import {
   type KeyboardEvent,
   type MouseEvent,

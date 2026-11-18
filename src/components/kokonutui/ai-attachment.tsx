@@ -19,7 +19,7 @@ import {
   useMotionValue,
   useReducedMotion,
   useTransform,
-} from "motion/react";
+} from "framer-motion";
 import { Fragment, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 

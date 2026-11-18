@@ -31,7 +31,7 @@ import {
   useMotionTemplate,
   useMotionValue,
   useReducedMotion,
-} from "motion/react";
+} from "framer-motion";
 import {
   type HTMLAttributes,
   type KeyboardEvent,

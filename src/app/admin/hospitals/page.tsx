@@ -8,7 +8,6 @@ import {
   AlertCircle, Loader2, FileText, Pencil, Trash2, ExternalLink, LogOut
 } from "lucide-react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { SunMoonThemeToggle } from "@/components/ui/sun-moon-theme-toggle";
 
@@ -79,8 +78,9 @@ export default function AdminHospitalsPage() {
 
   const fetchHospitals = async () => {
     setLoading(true);
-    const { data } = await supabase.from("hospitals").select("*").order("created_at", { ascending: false });
-    setHospitals(data || []);
+    const response = await fetch('/backend-api/admin/hospitals');
+    const result = await response.json();
+    setHospitals(result.data || []);
     setLoading(false);
   };
 
@@ -97,13 +97,13 @@ export default function AdminHospitalsPage() {
   const uploadLicenseDocument = async (): Promise<string | null> => {
     if (!licenseFile) return null;
     setUploading(true);
-    const ext = licenseFile.name.split(".").pop();
-    const path = `licenses/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from("hospital-documents").upload(path, licenseFile);
+    const body = new FormData();
+    body.append("file", licenseFile);
+    const response = await fetch("/backend-api/admin/hospitals/license-document", { method: "POST", body });
+    const result = await response.json();
     setUploading(false);
-    if (error) { showToast("error", "License upload failed: " + error.message); return null; }
-    const { data } = supabase.storage.from("hospital-documents").getPublicUrl(path);
-    return data.publicUrl;
+    if (!response.ok) { showToast("error", result.error || "License upload failed"); return null; }
+    return result.data.url;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,12 +127,15 @@ export default function AdminHospitalsPage() {
     };
     if (licenseDocUrl) payload.license_document_url = licenseDocUrl;
 
-    const { error } = editingId
-      ? await supabase.from("hospitals").update(payload).eq("id", editingId)
-      : await supabase.from("hospitals").insert(payload);
+    const response = await fetch(editingId ? `/backend-api/admin/hospitals/${editingId}` : '/backend-api/admin/hospitals', {
+      method: editingId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
 
     setSaving(false);
-    if (error) { showToast("error", error.message); return; }
+    if (!response.ok) { showToast("error", result.error || 'Failed to save hospital'); return; }
 
     showToast("success", editingId ? "Hospital updated successfully." : "Hospital added successfully.");
     resetForm();
@@ -169,15 +172,19 @@ export default function AdminHospitalsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("hospitals").delete().eq("id", id);
-    if (error) { showToast("error", error.message); return; }
-    showToast("success", "Hospital deleted.");
+    const response = await fetch(`/backend-api/admin/hospitals/${id}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!response.ok) { showToast("error", result.error || 'Failed to deactivate hospital'); return; }
+    showToast("success", "Hospital deactivated.");
     setDeleteConfirm(null);
     fetchHospitals();
   };
 
   const toggleActive = async (id: string, current: boolean) => {
-    await supabase.from("hospitals").update({ is_active: !current }).eq("id", id);
+    await fetch(`/backend-api/admin/hospitals/${id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !current }),
+    });
     fetchHospitals();
   };
 
