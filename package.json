@@ -8,7 +8,8 @@
     "dev:backend": "mvn -f backend/pom.xml spring-boot:run",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "audit:prod": "npm audit --omit=dev"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.10.2",
