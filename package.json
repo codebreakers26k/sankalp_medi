@@ -4,6 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/dev.mjs",
+    "dev:up": "node scripts/dev-control.mjs start",
+    "dev:down": "node scripts/dev-control.mjs stop",
+    "dev:restart": "node scripts/dev-control.mjs restart",
+    "dev:status": "node scripts/dev-control.mjs status",
+    "dev:logs": "node scripts/dev-control.mjs logs",
     "dev:frontend": "next dev",
     "dev:backend": "mvn -f backend/pom.xml spring-boot:run",
     "build": "next build",
