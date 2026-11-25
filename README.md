@@ -37,3 +37,18 @@ npm run build
 See [SETUP_GUIDE.md](SETUP_GUIDE.md), [SUPABASE_SETUP.md](SUPABASE_SETUP.md), and [RBAC_FLOW.md](RBAC_FLOW.md).
 
 Never commit `.env`, database passwords, Clerk secrets, SMTP credentials, or Supabase server keys.
+
+## Deploy
+
+The Next.js frontend can run on Vercel. Deploy the Java backend separately on Render using the
+root `render.yaml` Blueprint. Render builds `backend/Dockerfile`, checks `/api/health`, and prompts
+for every secret instead of storing credentials in Git.
+
+After Render reports a healthy deployment, add this environment variable to the Vercel project and
+redeploy the frontend:
+
+```text
+SPRING_BACKEND_URL=https://YOUR-RENDER-SERVICE.onrender.com
+```
+
+Do not append `/api`; the Next.js proxy adds it automatically.

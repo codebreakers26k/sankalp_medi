@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: sankalp-medi-backend
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_ORIGIN
+        value: https://sankalp-medi.vercel.app
+      - key: DATABASE_POOL_SIZE
+        value: 5
+      - key: FLYWAY_ENABLED
+        value: true
+      - key: EXPOSE_DEVELOPMENT_OTP
+        value: false
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_FROM_NAME
+        value: MediQueue Pro
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: CLERK_ISSUER_URI
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
