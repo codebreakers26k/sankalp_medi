@@ -1,9 +1,10 @@
 FROM maven:3.9-eclipse-temurin-17-alpine AS build
 
 WORKDIR /workspace
+COPY maven-settings.xml ./maven-settings.xml
 COPY pom.xml ./
 COPY src ./src
-RUN mvn -B -DskipTests clean package
+RUN mvn -B --settings ./maven-settings.xml -DskipTests clean package
 
 FROM eclipse-temurin:17-jre-alpine
 
